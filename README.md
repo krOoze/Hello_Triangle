@@ -11,6 +11,8 @@ But I have tried not to cut corners making it. It contains proper error handling
 and I assume it is without errors :innocent:. It should perfectly adhere to the Vulkan spec
 e.g. it should do proper synchronization and do so in efficient way (as it was meant to be used).
 
+TODO: check features and limits
+
 Requirements
 ----------------------------
 
@@ -41,10 +43,19 @@ Files
 Config
 ---------------------------------------
 
-You can change the validation layer configuration by adjusting
-`debugVulkan` and `debugAmount` variable in `HelloTriangle.cpp`.
+You can change the application configuration by simply changing following
+variables in `HelloTriangle.cpp`.
 
-You can change present mode by setting `presentMode` variable in `HelloTriangle.cpp`.
+| config variable | purpose |
+|---|---|
+| `debugVulkan` | Turns debug output and validation layers on |
+| `debugAmount` | Which kinds of debug messages will be shown |
+| `windowWidth` | The width of the rendered window |
+| `windowHeight` | The height of the rendered window |
+| `presentMode` | The presentation mode of Vulkan used in swapchain |
+| `clearColor` | Background color of the rendering |
+| `vertexShaderFilename` | The file with the SPIR-V vertex shader program |
+| `fragmentShaderFilename` | The file with the SPIR-V fragment shader program |
 
 Build
 ----------------------------------------------

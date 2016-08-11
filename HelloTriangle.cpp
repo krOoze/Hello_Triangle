@@ -62,8 +62,17 @@ constexpr bool debugVulkan = false;
 constexpr VkDebugReportFlagsEXT debugAmount = 0;
 #endif
 
-// swapchain
+// window and swapchain
+constexpr int windowWidth = 800;
+constexpr int windowHeight = 800;
+
 constexpr VkPresentModeKHR presentMode = VK_PRESENT_MODE_IMMEDIATE_KHR;
+
+// pipeline settings
+constexpr VkClearValue clearColor = { {0.1f, 0.1f, 0.1f, 1.0f} };
+
+const char* vertexShaderFilename = "triangle.vert.spv";
+const char* fragmentShaderFilename = "triangle.frag.spv";
 
 // Error handling
 //////////////////////
@@ -164,7 +173,7 @@ void killSemaphore( VkDevice device, VkSemaphore semaphore );
 VkCommandPool initCommandPool( VkDevice device, const uint32_t queueFamily );
 void killCommandPool( VkDevice device, VkCommandPool commandPool );
 
-vector<VkCommandBuffer> aquireCommandBuffers( VkDevice device, VkCommandPool commandPool, uint32_t count );
+vector<VkCommandBuffer> acquireCommandBuffers( VkDevice device, VkCommandPool commandPool, uint32_t count );
 void beginCommandBuffer( VkCommandBuffer commandBuffer );
 void endCommandBuffer( VkCommandBuffer commandBuffer );
 
@@ -188,15 +197,7 @@ int messageLoop( bool& quit );
 ////////////////////////
 
 int main() try{
-	const int width = 800;
-	const int height = 800;
-
-	const string vertexShaderFilename = "triangle.vert.spv";
-	const string fragmentShaderFilename = "triangle.frag.spv";
-
 	const uint32_t vertexBufferBinding = 0;
-
-	VkClearValue clearColor = { {0.1f, 0.1f, 0.1f, 1.0f} };
 
 	const float triangleSize = 1.6f;
 	vector<Vertex> triangle = {
@@ -217,20 +218,20 @@ int main() try{
 	VkDevice device = initDevice( physicalDevice, queueFamily, {"VK_LAYER_LUNARG_standard_validation"}, {VK_KHR_SWAPCHAIN_EXTENSION_NAME} );
 	VkQueue queue = getQueue( device, queueFamily, 0 );
 
-	PlatformWindow window = initWindow( width, height );
+	PlatformWindow window = initWindow( ::windowWidth, ::windowHeight );
 	VkSurfaceKHR surface = initSurface( instance, physicalDevice, queueFamily, window );
 	VkSurfaceCapabilitiesKHR surfaceCapabilities = getSurfaceCapabilities( physicalDevice, surface );
-	if( surfaceCapabilities.currentExtent.width != width || surfaceCapabilities.currentExtent.height != height ) throw "Surface size does not match requested size!";
+	if( surfaceCapabilities.currentExtent.width != ::windowWidth || surfaceCapabilities.currentExtent.height != ::windowHeight ) throw "Surface size does not match requested size!";
 	VkSurfaceFormatKHR surfaceFormat = getSurfaceFormat( physicalDevice, surface );
 	VkSwapchainKHR swapchain = initSwapchain( physicalDevice, device, surface, surfaceFormat );
 	vector<VkImage> swapchainImages = getSwapchainImages( device, swapchain );
 	vector<VkImageView> swapchainImageViews = initSwapchainImageViews( device, swapchainImages, surfaceFormat.format );
 
 	VkRenderPass renderPass = initRenderPass( device, surfaceFormat );
-	vector<VkFramebuffer> framebuffers = initFramebuffers( device, renderPass, swapchainImageViews, width, height );
+	vector<VkFramebuffer> framebuffers = initFramebuffers( device, renderPass, swapchainImageViews, ::windowWidth, ::windowHeight );
 
-	VkShaderModule vertexShader = initShaderModule( device, vertexShaderFilename );
-	VkShaderModule fragmentShader = initShaderModule( device, fragmentShaderFilename );
+	VkShaderModule vertexShader = initShaderModule( device, ::vertexShaderFilename );
+	VkShaderModule fragmentShader = initShaderModule( device, ::fragmentShaderFilename );
 	VkPipelineLayout pipelineLayout = initPipelineLayout( device );
 	VkPipeline pipeline = initPipeline( device, physicalDeviceProperties.limits, pipelineLayout, renderPass, vertexShader, fragmentShader, vertexBufferBinding );
 
@@ -243,16 +244,16 @@ int main() try{
 
 	VkCommandPool commandPool = initCommandPool( device, queueFamily );
 
-	vector<VkCommandBuffer> commandBuffers = aquireCommandBuffers(  device, commandPool, static_cast<uint32_t>( swapchainImages.size() )  );
+	vector<VkCommandBuffer> commandBuffers = acquireCommandBuffers(  device, commandPool, static_cast<uint32_t>( swapchainImages.size() )  );
 	for( size_t i = 0; i < commandBuffers.size(); ++i ){
 		beginCommandBuffer( commandBuffers[i] );
-			recordBeginRenderPass( commandBuffers[i], renderPass, framebuffers[i], clearColor, width, height );
+			recordBeginRenderPass( commandBuffers[i], renderPass, framebuffers[i], ::clearColor, ::windowWidth, ::windowHeight );
 
 			recordBindPipeline( commandBuffers[i], pipeline );
 			recordBindVertexBuffer( commandBuffers[i], vertexBufferBinding, vertexBuffer );
 
-			recordSetViewport( commandBuffers[i], width, height );
-			recordSetScissor( commandBuffers[i], width, height );
+			recordSetViewport( commandBuffers[i], ::windowWidth, ::windowHeight );
+			recordSetScissor( commandBuffers[i], ::windowWidth, ::windowHeight );
 
 			recordDraw( commandBuffers[i], triangle );
 
@@ -734,7 +735,7 @@ VkDevice initDevice( VkPhysicalDevice physDevice, uint32_t queueFamilyIndex, vec
 
 VkDevice initDevice( VkPhysicalDevice physDevice, const VkPhysicalDeviceFeatures& features, uint32_t queueFamilyIndex, vector<const char*> layers, vector<const char*> extensions ){
 
-	float priority[1] = {1.0f};
+	const float priority[] = {1.0f};
 	VkDeviceQueueCreateInfo qci{
 		VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
 		nullptr,
@@ -1364,7 +1365,7 @@ void killCommandPool( VkDevice device, VkCommandPool commandPool ){
 	vkDestroyCommandPool( device, commandPool, nullptr );
 }
 
-vector<VkCommandBuffer> aquireCommandBuffers( VkDevice device, VkCommandPool commandPool, uint32_t count ){
+vector<VkCommandBuffer> acquireCommandBuffers( VkDevice device, VkCommandPool commandPool, uint32_t count ){
 	VkCommandBufferAllocateInfo commandBufferInfo{
 		VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
 		nullptr, // pNext
