@@ -11,7 +11,8 @@ But I have tried not to cut corners making it. It contains proper error handling
 and I assume it is without errors :innocent:. It should perfectly adhere to the Vulkan spec
 e.g. it should do proper synchronization and do so in efficient way (as it was meant to be used).
 
-TODO: check features and limits
+ - TODO: check features and limits
+ - TODO: make vertex buffer in best memory + investigate device memory alignment
 
 Proper renderloop synchronization mini-tutorial
 -------------------------------------

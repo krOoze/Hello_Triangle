@@ -56,7 +56,12 @@ using std::chrono::duration_cast;
 // layers and debug
 #ifdef _DEBUG
 constexpr bool debugVulkan = true;
-constexpr VkDebugReportFlagsEXT debugAmount = /*VK_DEBUG_REPORT_INFORMATION_BIT_EXT |*/ VK_DEBUG_REPORT_WARNING_BIT_EXT | VK_DEBUG_REPORT_PERFORMANCE_WARNING_BIT_EXT | VK_DEBUG_REPORT_ERROR_BIT_EXT /*| VK_DEBUG_REPORT_DEBUG_BIT_EXT*/;
+constexpr VkDebugReportFlagsEXT debugAmount =
+	/*VK_DEBUG_REPORT_INFORMATION_BIT_EXT |*/
+	VK_DEBUG_REPORT_WARNING_BIT_EXT |
+	VK_DEBUG_REPORT_PERFORMANCE_WARNING_BIT_EXT |
+	VK_DEBUG_REPORT_ERROR_BIT_EXT /*|
+	VK_DEBUG_REPORT_DEBUG_BIT_EXT*/;
 #else
 constexpr bool debugVulkan = false;
 constexpr VkDebugReportFlagsEXT debugAmount = 0;
@@ -113,11 +118,51 @@ VkPhysicalDeviceMemoryProperties getPhysicalDeviceMemoryProperties( VkPhysicalDe
 
 uint32_t getQueueFamily( VkPhysicalDevice physDevice );
 
-VkDevice initDevice( VkPhysicalDevice physDevice, const VkPhysicalDeviceFeatures& features, uint32_t queueFamilyIndex, vector<const char*> layers = {}, vector<const char*> extensions = {} );
-VkDevice initDevice( VkPhysicalDevice physDevice, uint32_t queueFamilyIndex, vector<const char*> layers = {}, vector<const char*> extensions = {} ); // for all features
+VkDevice initDevice(
+	VkPhysicalDevice physDevice,
+	const VkPhysicalDeviceFeatures& features,
+	uint32_t queueFamilyIndex,
+	vector<const char*> layers = {},
+	vector<const char*> extensions = {}
+);
+VkDevice initDevice( // for all features
+	VkPhysicalDevice physDevice,
+	uint32_t queueFamilyIndex,
+	vector<const char*> layers = {},
+	vector<const char*> extensions = {}
+);
 void killDevice( VkDevice device );
 
 VkQueue getQueue( VkDevice device, uint32_t queueFamily, uint32_t queueIndex );
+
+
+enum class ResourceType{ Buffer, Image };
+
+template< ResourceType resourceType, class T >
+VkDeviceMemory initMemory(
+	VkDevice device,
+	VkPhysicalDeviceMemoryProperties physicalDeviceMemoryProperties,
+	T resource,
+	VkMemoryPropertyFlags requiredFlags,
+	VkMemoryPropertyFlags desiredFlags = 0
+);
+void setMemoryData( VkDevice device, VkDeviceMemory memory, void* begin, size_t size );
+void killMemory( VkDevice device, VkDeviceMemory memory );
+
+VkBuffer initBuffer( VkDevice device, VkDeviceSize size, VkBufferUsageFlags usage );
+void killBuffer( VkDevice device, VkBuffer buffer );
+
+VkImage initImage(
+	VkDevice device,
+	VkFormat format,
+	uint32_t width, uint32_t height,
+	VkSampleCountFlagBits samples,
+	VkImageUsageFlags usage
+);
+void killImage( VkDevice device, VkImage image );
+
+VkImageView initImageView( VkDevice device, VkImage image, VkFormat format );
+void killImageView( VkDevice device, VkImageView imageView );
 
 
 #ifdef VK_USE_PLATFORM_WIN32_KHR
@@ -147,7 +192,12 @@ void killSwapchainImageViews( VkDevice device, vector<VkImageView> imageViews );
 VkRenderPass initRenderPass( VkDevice device, VkSurfaceFormatKHR surfaceFormat );
 void killRenderPass( VkDevice device, VkRenderPass renderPass );
 
-vector<VkFramebuffer> initFramebuffers( VkDevice device, VkRenderPass renderPass, vector<VkImageView> imageViews, uint32_t width, uint32_t height );
+vector<VkFramebuffer> initFramebuffers(
+	VkDevice device,
+	VkRenderPass renderPass,
+	vector<VkImageView> imageViews,
+	uint32_t width, uint32_t height
+);
 void killFramebuffers( VkDevice device, vector<VkFramebuffer> framebuffers );
 
 
@@ -157,15 +207,19 @@ void killShaderModule( VkDevice device, VkShaderModule shaderModule );
 VkPipelineLayout initPipelineLayout( VkDevice device );
 void killPipelineLayout( VkDevice device, VkPipelineLayout pipelineLayout );
 
-VkPipeline initPipeline( VkDevice device, VkPhysicalDeviceLimits limits, VkPipelineLayout pipelineLayout, VkRenderPass renderPass, VkShaderModule vertexShader, VkShaderModule fragmentShader, const uint32_t vertexBufferBinding );
+VkPipeline initPipeline(
+	VkDevice device,
+	VkPhysicalDeviceLimits limits,
+	VkPipelineLayout pipelineLayout,
+	VkRenderPass renderPass,
+	VkShaderModule vertexShader,
+	VkShaderModule fragmentShader,
+	const uint32_t vertexBufferBinding
+);
 void killPipeline( VkDevice device, VkPipeline pipeline );
 
 
-VkBuffer initVertexBuffer( VkDevice device, const uint32_t queueFamily, VkDeviceSize size );
-void killBuffer( VkDevice device, VkBuffer buffer );
-
-VkDeviceMemory initBufferMemory( VkDevice device, VkPhysicalDeviceMemoryProperties physicalDeviceMemoryProperties, VkBuffer buffer, vector<Vertex> vertices );
-void killBufferMemory( VkDevice device, VkDeviceMemory memory );
+void setVertexData( VkDevice device, VkDeviceMemory memory, vector<Vertex> vertices );
 
 VkSemaphore initSemaphore( VkDevice device );
 void killSemaphore( VkDevice device, VkSemaphore semaphore );
@@ -177,7 +231,13 @@ vector<VkCommandBuffer> acquireCommandBuffers( VkDevice device, VkCommandPool co
 void beginCommandBuffer( VkCommandBuffer commandBuffer );
 void endCommandBuffer( VkCommandBuffer commandBuffer );
 
-void recordBeginRenderPass( VkCommandBuffer commandBuffer, VkRenderPass renderPass, VkFramebuffer framebuffer, VkClearValue clearValue, uint32_t width, uint32_t height );
+void recordBeginRenderPass(
+	VkCommandBuffer commandBuffer,
+	VkRenderPass renderPass,
+	VkFramebuffer framebuffer,
+	VkClearValue clearValue,
+	uint32_t width, uint32_t height
+);
 void recordEndRenderPass( VkCommandBuffer commandBuffer );
 
 void recordBindPipeline( VkCommandBuffer commandBuffer, VkPipeline pipeline );
@@ -206,8 +266,13 @@ int main() try{
 		{ /*lb*/ { -0.5f * triangleSize,  sqrtf( 3.0f ) * 0.25f * triangleSize }, /*B*/{ 0.0f, 0.0f, 1.0f }  }
 	};
 
+	vector<const char*> layers;
+	if( ::debugVulkan ) layers.push_back( "VK_LAYER_LUNARG_standard_validation" );
 
-	VkInstance instance = initInstance( {"VK_LAYER_LUNARG_standard_validation"}, {VK_KHR_SURFACE_EXTENSION_NAME, PLATFORM_SURFACE_EXTENSION_NAME, VK_EXT_DEBUG_REPORT_EXTENSION_NAME} );
+	VkInstance instance = initInstance(
+		layers,
+		{VK_KHR_SURFACE_EXTENSION_NAME, PLATFORM_SURFACE_EXTENSION_NAME, VK_EXT_DEBUG_REPORT_EXTENSION_NAME}
+	);
 	loadVulkanExtensions( instance );
 	VkDebugReportCallbackEXT debug = ::debugVulkan ? initDebug( instance ) : VK_NULL_HANDLE;
 
@@ -215,28 +280,50 @@ int main() try{
 	VkPhysicalDeviceProperties physicalDeviceProperties = getPhysicalDeviceProperties( physicalDevice );
 	VkPhysicalDeviceMemoryProperties physicalDeviceMemoryProperties = getPhysicalDeviceMemoryProperties( physicalDevice );
 	uint32_t queueFamily = getQueueFamily( physicalDevice );
-	VkDevice device = initDevice( physicalDevice, queueFamily, {"VK_LAYER_LUNARG_standard_validation"}, {VK_KHR_SWAPCHAIN_EXTENSION_NAME} );
+	VkDevice device = initDevice(
+		physicalDevice, queueFamily,
+		layers,
+		{VK_KHR_SWAPCHAIN_EXTENSION_NAME}
+	);
 	VkQueue queue = getQueue( device, queueFamily, 0 );
 
 	PlatformWindow window = initWindow( ::windowWidth, ::windowHeight );
 	VkSurfaceKHR surface = initSurface( instance, physicalDevice, queueFamily, window );
 	VkSurfaceCapabilitiesKHR surfaceCapabilities = getSurfaceCapabilities( physicalDevice, surface );
-	if( surfaceCapabilities.currentExtent.width != ::windowWidth || surfaceCapabilities.currentExtent.height != ::windowHeight ) throw "Surface size does not match requested size!";
+	if( surfaceCapabilities.currentExtent.width != ::windowWidth || surfaceCapabilities.currentExtent.height != ::windowHeight ){
+		throw "Surface size does not match requested size!";
+	}
 	VkSurfaceFormatKHR surfaceFormat = getSurfaceFormat( physicalDevice, surface );
 	VkSwapchainKHR swapchain = initSwapchain( physicalDevice, device, surface, surfaceFormat );
 	vector<VkImage> swapchainImages = getSwapchainImages( device, swapchain );
 	vector<VkImageView> swapchainImageViews = initSwapchainImageViews( device, swapchainImages, surfaceFormat.format );
 
 	VkRenderPass renderPass = initRenderPass( device, surfaceFormat );
+
 	vector<VkFramebuffer> framebuffers = initFramebuffers( device, renderPass, swapchainImageViews, ::windowWidth, ::windowHeight );
 
 	VkShaderModule vertexShader = initShaderModule( device, ::vertexShaderFilename );
 	VkShaderModule fragmentShader = initShaderModule( device, ::fragmentShaderFilename );
 	VkPipelineLayout pipelineLayout = initPipelineLayout( device );
-	VkPipeline pipeline = initPipeline( device, physicalDeviceProperties.limits, pipelineLayout, renderPass, vertexShader, fragmentShader, vertexBufferBinding );
+	VkPipeline pipeline = initPipeline(
+		device,
+		physicalDeviceProperties.limits,
+		pipelineLayout,
+		renderPass,
+		vertexShader,
+		fragmentShader,
+		vertexBufferBinding
+	);
 
-	VkBuffer vertexBuffer = initVertexBuffer( device, queueFamily, sizeof( decltype( triangle )::value_type ) * triangle.size() );
-	VkDeviceMemory deviceMemory = initBufferMemory( device, physicalDeviceMemoryProperties, vertexBuffer, triangle );
+	VkBuffer vertexBuffer = initBuffer( device, sizeof( decltype( triangle )::value_type ) * triangle.size(), VK_BUFFER_USAGE_VERTEX_BUFFER_BIT );
+	VkDeviceMemory vertexBufferMemory = initMemory<ResourceType::Buffer>(
+		device,
+		physicalDeviceMemoryProperties,
+		vertexBuffer,
+		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
+	);
+	setVertexData( device, vertexBufferMemory, triangle );
 
 	VkSemaphore imageReadyS = initSemaphore( device );
 	VkSemaphore renderDoneS = initSemaphore( device );
@@ -289,7 +376,7 @@ int main() try{
 	killSemaphore( device, imageReadyS );
 	killSemaphore( device, renderDoneS );
 
-	killBufferMemory( device, deviceMemory );
+	killMemory( device, vertexBufferMemory );
 	killBuffer( device, vertexBuffer );
 
 	killPipeline( device, pipeline );
@@ -298,6 +385,7 @@ int main() try{
 	killShaderModule( device, vertexShader );
 
 	killFramebuffers( device, framebuffers );
+
 	killRenderPass( device, renderPass );
 
 	killSwapchainImageViews( device, swapchainImageViews );
@@ -313,7 +401,9 @@ int main() try{
 	return ret;
 }
 catch( VulkanResultException vkE ){
-	cout << "ERROR: Terminated due to an uncaught VkResult exception: " << vkE.file << ":" << vkE.line << ":" << vkE.func << "() " << vkE.source << "() returned " << to_string( vkE.result ) << endl;
+	cout << "ERROR: Terminated due to an uncaught VkResult exception: "
+	     << vkE.file << ":" << vkE.line << ":" << vkE.func << "() " << vkE.source << "() returned " << to_string( vkE.result )
+	     << endl;
 }
 catch( const char* e ){
 	cout << "ERROR: Terminated due to an uncaught exception: " << e << endl;
@@ -332,7 +422,11 @@ catch( ... ){
 #if defined(_WIN32) || defined(__CYGWIN__)
 // In case of non console subsystem just relay to main()
 int CALLBACK WinMain( _In_ HINSTANCE hInstance, _In_ HINSTANCE hPrevInstance, _In_ LPSTR lpCmdLine, _In_ int nCmdShow ){
-	UNREFERENCED_PARAMETER( hInstance ); UNREFERENCED_PARAMETER( hPrevInstance ); UNREFERENCED_PARAMETER( lpCmdLine ); UNREFERENCED_PARAMETER( nCmdShow );
+	UNREFERENCED_PARAMETER( hInstance );
+	UNREFERENCED_PARAMETER( hPrevInstance );
+	UNREFERENCED_PARAMETER( lpCmdLine );
+	UNREFERENCED_PARAMETER( nCmdShow );
+
 	return main();
 }
 #endif
@@ -447,7 +541,9 @@ PlatformWindow initWindow( int canvasWidth, int canvasHeight ){
 
 void killWindow( PlatformWindow window ){
 	if(  !DestroyWindow( window.hWnd )  ) throw string( "Trouble destroying window instance: " ) + to_string( GetLastError() );
-	if(  !UnregisterClassW( MAKEINTATOM(window.wndClass), window.hInstance )  ) throw string( "Trouble unregistering window class: " ) + to_string( GetLastError() );
+	if(  !UnregisterClassW( MAKEINTATOM(window.wndClass), window.hInstance )  ){
+		throw string( "Trouble unregistering window class: " ) + to_string( GetLastError() );
+	}
 }
 
 VkSurfaceKHR initSurface( VkInstance instance, VkPhysicalDevice physicalDevice, uint32_t queueFamily, PlatformWindow window ){
@@ -544,8 +640,16 @@ const char* to_string( VkDebugReportObjectTypeEXT o ){
 	}
 }
 
-static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback( VkFlags msgFlags, VkDebugReportObjectTypeEXT objType, uint64_t srcObject, size_t /*location*/,
-                                                    int32_t msgCode, const char* pLayerPrefix, const char* pMsg, void* /*pUserData*/ ){
+static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
+	VkFlags msgFlags,
+	VkDebugReportObjectTypeEXT objType,
+	uint64_t srcObject,
+	size_t /*location*/,
+	int32_t msgCode,
+	const char* pLayerPrefix,
+	const char* pMsg,
+	void* /*pUserData*/
+){
 
 	string report = to_string( objType ) + to_string( srcObject ) + ": " + to_string( msgCode ) + ", " + pLayerPrefix + ", " + pMsg;;
 
@@ -624,17 +728,35 @@ void killInstance( VkInstance instance ){
 }
 
 PFN_vkCreateDebugReportCallbackEXT fpCreateDebugReportCallbackEXT = nullptr;
-VKAPI_ATTR VkResult VKAPI_CALL vkCreateDebugReportCallbackEXT( VkInstance instance, const VkDebugReportCallbackCreateInfoEXT* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkDebugReportCallbackEXT* pCallback ){
+VKAPI_ATTR VkResult VKAPI_CALL vkCreateDebugReportCallbackEXT(
+	VkInstance instance,
+	const VkDebugReportCallbackCreateInfoEXT* pCreateInfo,
+	const VkAllocationCallbacks* pAllocator,
+	VkDebugReportCallbackEXT* pCallback
+){
 	return fpCreateDebugReportCallbackEXT( instance, pCreateInfo, pAllocator, pCallback );
 }
 
 PFN_vkDestroyDebugReportCallbackEXT fpDestroyDebugReportCallbackEXT = nullptr;
-VKAPI_ATTR void VKAPI_CALL vkDestroyDebugReportCallbackEXT( VkInstance instance, VkDebugReportCallbackEXT callback, const VkAllocationCallbacks* pAllocator ){
+VKAPI_ATTR void VKAPI_CALL vkDestroyDebugReportCallbackEXT(
+	VkInstance instance,
+	VkDebugReportCallbackEXT callback,
+	const VkAllocationCallbacks* pAllocator
+){
 	fpDestroyDebugReportCallbackEXT( instance, callback, pAllocator );
 }
 
 PFN_vkDebugReportMessageEXT fpDebugReportMessageEXT = nullptr;
-VKAPI_ATTR void VKAPI_CALL vkDebugReportMessageEXT( VkInstance instance, VkDebugReportFlagsEXT flags, VkDebugReportObjectTypeEXT objectType, uint64_t object, size_t location, int32_t messageCode, const char* pLayerPrefix, const char* pMessage ){
+VKAPI_ATTR void VKAPI_CALL vkDebugReportMessageEXT(
+	VkInstance instance,
+	VkDebugReportFlagsEXT flags,
+	VkDebugReportObjectTypeEXT objectType,
+	uint64_t object,
+	size_t location,
+	int32_t messageCode,
+	const char* pLayerPrefix,
+	const char* pMessage
+){
 	fpDebugReportMessageEXT( instance, flags, objectType, object, location, messageCode, pLayerPrefix, pMessage );
 }
 
@@ -733,7 +855,13 @@ VkDevice initDevice( VkPhysicalDevice physDevice, uint32_t queueFamilyIndex, vec
 	return initDevice( physDevice, ft, queueFamilyIndex, layers, extensions );
 }
 
-VkDevice initDevice( VkPhysicalDevice physDevice, const VkPhysicalDeviceFeatures& features, uint32_t queueFamilyIndex, vector<const char*> layers, vector<const char*> extensions ){
+VkDevice initDevice(
+	VkPhysicalDevice physDevice,
+	const VkPhysicalDeviceFeatures& features,
+	uint32_t queueFamilyIndex,
+	vector<const char*> layers,
+	vector<const char*> extensions
+){
 
 	const float priority[] = {1.0f};
 	VkDeviceQueueCreateInfo qci{
@@ -780,6 +908,181 @@ VkQueue getQueue( VkDevice device, uint32_t queueFamily, uint32_t queueIndex ){
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+template< ResourceType resourceType, class T >
+VkMemoryRequirements getMemoryRequirements( VkDevice device, T resource );
+
+template<>
+VkMemoryRequirements getMemoryRequirements< ResourceType::Buffer >( VkDevice device, VkBuffer buffer ){
+	VkMemoryRequirements memoryRequirements;
+	vkGetBufferMemoryRequirements( device, buffer, &memoryRequirements );
+
+	return memoryRequirements;
+}
+
+template<>
+VkMemoryRequirements getMemoryRequirements< ResourceType::Image >( VkDevice device, VkImage image ){
+	VkMemoryRequirements memoryRequirements;
+	vkGetImageMemoryRequirements( device, image, &memoryRequirements );
+
+	return memoryRequirements;
+}
+
+template< ResourceType resourceType, class T >
+void bindMemory( VkDevice device, T buffer, VkDeviceMemory memory, VkDeviceSize offset );
+
+template<>
+void bindMemory< ResourceType::Buffer >( VkDevice device, VkBuffer buffer, VkDeviceMemory memory, VkDeviceSize offset ){
+	VkResult errorCode = vkBindBufferMemory( device, buffer, memory, offset ); RESULT_HANDLER( errorCode, "vkBindBufferMemory" );
+}
+
+template<>
+void bindMemory< ResourceType::Image >( VkDevice device, VkImage image, VkDeviceMemory memory, VkDeviceSize offset ){
+	VkResult errorCode = vkBindImageMemory( device, image, memory, offset ); RESULT_HANDLER( errorCode, "vkBindImageMemory" );
+}
+
+template< ResourceType resourceType, class T >
+VkDeviceMemory initMemory(
+	VkDevice device,
+	VkPhysicalDeviceMemoryProperties physicalDeviceMemoryProperties,
+	T resource,
+	VkMemoryPropertyFlags requiredFlags,
+	VkMemoryPropertyFlags desiredFlags
+){
+	VkMemoryRequirements memoryRequirements = getMemoryRequirements<resourceType>( device, resource );
+
+	uint32_t memoryType = 0;
+	bool found = false;
+
+	for( uint32_t i = 0; i < 32; ++i ){
+		if( memoryRequirements.memoryTypeBits & 0x1 ){
+			if( (physicalDeviceMemoryProperties.memoryTypes[i].propertyFlags & requiredFlags) == requiredFlags ){
+				if( !found ){
+					memoryType = i;
+					found = true;
+				}
+				else if( /*found &&*/ (physicalDeviceMemoryProperties.memoryTypes[i].propertyFlags & desiredFlags) == desiredFlags ){
+					memoryType = i;
+				}
+			}
+		}
+
+		memoryRequirements.memoryTypeBits >>= 1;
+	}
+
+	if( !found ) throw "Can't find compatible mappable memory for the resource";
+
+	VkMemoryAllocateInfo memoryInfo{
+		VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
+		nullptr, // pNext
+		memoryRequirements.size,
+		memoryType
+	};
+
+	VkDeviceMemory memory;
+	VkResult errorCode = vkAllocateMemory( device, &memoryInfo, nullptr, &memory ); RESULT_HANDLER( errorCode, "vkAllocateMemory" );
+
+	bindMemory<resourceType>( device, resource, memory, 0 /*offset*/ );
+
+	return memory;
+}
+
+void setMemoryData( VkDevice device, VkDeviceMemory memory, void* begin, size_t size ){
+	void* data;
+	VkResult errorCode = vkMapMemory( device, memory, 0 /*offset*/, VK_WHOLE_SIZE, 0 /*flags - reserved*/, &data ); RESULT_HANDLER( errorCode, "vkMapMemory" );
+	memcpy( data, begin, size );
+	vkUnmapMemory( device, memory );
+}
+
+void killMemory( VkDevice device, VkDeviceMemory memory ){
+	vkFreeMemory( device, memory, nullptr );
+}
+
+
+VkBuffer initBuffer( VkDevice device, VkDeviceSize size, VkBufferUsageFlags usage ){
+	VkBufferCreateInfo bufferInfo{
+		VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
+		nullptr, // pNext
+		0, // flags
+		size,
+		usage,
+		VK_SHARING_MODE_EXCLUSIVE,
+		0, // queue family count -- ignored for EXCLUSIVE
+		nullptr // queue families -- ignored for EXCLUSIVE
+	};
+
+	VkBuffer buffer;
+	VkResult errorCode = vkCreateBuffer( device, &bufferInfo, nullptr, &buffer ); RESULT_HANDLER( errorCode, "vkCreateBuffer" );
+	return buffer;
+}
+
+void killBuffer( VkDevice device, VkBuffer buffer ){
+	vkDestroyBuffer( device, buffer, nullptr );
+}
+
+VkImage initImage( VkDevice device, VkFormat format, uint32_t width, uint32_t height, VkSampleCountFlagBits samples, VkImageUsageFlags usage ){
+	VkExtent3D size{
+		width,
+		height,
+		1 // depth
+	};
+
+	VkImageCreateInfo ici{
+		VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
+		nullptr, // pNext
+		0, // flags
+		VK_IMAGE_TYPE_2D,
+		format,
+		size,
+		1, // mipLevels
+		1, // arrayLayers
+		samples,
+		VK_IMAGE_TILING_OPTIMAL,
+		usage,
+		VK_SHARING_MODE_EXCLUSIVE,
+		0, // queueFamilyIndexCount -- ignored for EXCLUSIVE
+		nullptr, // pQueueFamilyIndices -- ignored for EXCLUSIVE
+		VK_IMAGE_LAYOUT_UNDEFINED
+	};
+
+	VkImage image;
+	VkResult errorCode = vkCreateImage( device, &ici, nullptr, &image ); RESULT_HANDLER( errorCode, "vkCreateImage" );
+
+	return image;
+}
+
+void killImage( VkDevice device, VkImage image ){
+	vkDestroyImage( device, image, nullptr );
+}
+
+VkImageView initImageView( VkDevice device, VkImage image, VkFormat format ){
+	VkImageViewCreateInfo iciv{
+		VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+		nullptr, // pNext
+		0, // flags
+		image,
+		VK_IMAGE_VIEW_TYPE_2D,
+		format,
+		{ VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY },
+		{
+			VK_IMAGE_ASPECT_COLOR_BIT,
+			/* base mip-level */ 0,
+			/* level count */ VK_REMAINING_MIP_LEVELS,
+			/* base array layer */ 0,
+			/* array layer count */ VK_REMAINING_ARRAY_LAYERS
+		}
+	};
+
+	VkImageView imageView;
+	VkResult errorCode = vkCreateImageView( device, &iciv, nullptr, &imageView ); RESULT_HANDLER( errorCode, "vkCreateImageView" );
+
+	return imageView;
+}
+
+void killImageView( VkDevice device, VkImageView imageView ){
+	vkDestroyImageView( device, imageView, nullptr );
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 vector<VkSurfaceFormatKHR> getSurfaceFormats( VkPhysicalDevice physicalDevice, VkSurfaceKHR surface ){
 	vector<VkSurfaceFormatKHR> formats;
@@ -802,7 +1105,9 @@ VkSurfaceFormatKHR getSurfaceFormat( VkPhysicalDevice physicalDevice, VkSurfaceK
 	vector<VkSurfaceFormatKHR> formats = getSurfaceFormats( physicalDevice, surface );
 
 	for( auto f : formats ){
-		if( f.format == /*VK_FORMAT_B8G8R8A8_SRGB*/ VK_FORMAT_B8G8R8A8_UNORM && f.colorSpace == VK_COLORSPACE_SRGB_NONLINEAR_KHR ) return f;
+		if( f.format == /*VK_FORMAT_B8G8R8A8_SRGB*/ VK_FORMAT_B8G8R8A8_UNORM && f.colorSpace == VK_COLORSPACE_SRGB_NONLINEAR_KHR ){
+			return f;
+		}
 	}
 
 	throw "No suitable Surface format found!";
@@ -845,9 +1150,13 @@ VkPresentModeKHR getSurfacePresentMode( VkPhysicalDevice physicalDevice, VkSurfa
 VkSwapchainKHR initSwapchain( VkPhysicalDevice physicalDevice, VkDevice device, VkSurfaceKHR surface, VkSurfaceFormatKHR surfaceFormat ){
 	VkSurfaceCapabilitiesKHR capabilities = getSurfaceCapabilities( physicalDevice, surface );
 
-	if(  !( capabilities.supportedUsageFlags & VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT )  ) throw "VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT not supported!";
+	if(  !( capabilities.supportedUsageFlags & VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT )  ){
+		throw "VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT not supported!";
+	}
 	// TODO: perhaps not really necessary
-	if(  !( capabilities.supportedCompositeAlpha & VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR )  ) throw "VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR not supported!";
+	if(  !( capabilities.supportedCompositeAlpha & VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR )  ){
+		throw "VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR not supported!";
+	}
 
 	VkSwapchainCreateInfoKHR swapchainInfo{
 		VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
@@ -899,7 +1208,14 @@ vector<VkImage> getSwapchainImages( VkDevice device, VkSwapchainKHR swapchain ){
 
 uint32_t getNextImageIndex( VkDevice device, VkSwapchainKHR swapchain, VkSemaphore imageReadyS ){
 	uint32_t nextImageIndex;
-	VkResult errorCode = vkAcquireNextImageKHR( device, swapchain, UINT64_MAX /* no timeout */, imageReadyS, VK_NULL_HANDLE, &nextImageIndex ); RESULT_HANDLER( errorCode, "vkAcquireNextImageKHR" );
+	VkResult errorCode = vkAcquireNextImageKHR(
+		device,
+		swapchain,
+		UINT64_MAX /* no timeout */,
+		imageReadyS,
+		VK_NULL_HANDLE,
+		&nextImageIndex
+	); RESULT_HANDLER( errorCode, "vkAcquireNextImageKHR" );
 
 	return nextImageIndex;
 }
@@ -908,19 +1224,8 @@ vector<VkImageView> initSwapchainImageViews( VkDevice device, vector<VkImage> im
 	vector<VkImageView> imageViews;
 
 	for( auto image : images ){
-		VkImageViewCreateInfo imageViewInfo{
-			VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
-			nullptr, // pNext
-			0, // flags - reserved for future use
-			image,
-			VK_IMAGE_VIEW_TYPE_2D,
-			format,
-			{ VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY },
-			{ VK_IMAGE_ASPECT_COLOR_BIT, /* base mip-level */ 0, /* level count */ VK_REMAINING_MIP_LEVELS, /* base array layer */ 0, /* array layer count */ VK_REMAINING_ARRAY_LAYERS }
-		};
+		VkImageView imageView = initImageView( device, image, format );
 
-		VkImageView imageView;
-		VkResult errorCode = vkCreateImageView( device, &imageViewInfo, nullptr, &imageView ); RESULT_HANDLER( errorCode, "vkCreateImageView" );
 		imageViews.push_back( imageView );
 	}
 
@@ -931,7 +1236,7 @@ void killSwapchainImageViews( VkDevice device, vector<VkImageView> imageViews ){
 	for( auto imageView : imageViews ) vkDestroyImageView( device, imageView, nullptr );
 }
 
-/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 VkRenderPass initRenderPass( VkDevice device, VkSurfaceFormatKHR surfaceFormat ){
 	VkAttachmentDescription colorAtachment{
@@ -1008,7 +1313,12 @@ void killRenderPass( VkDevice device, VkRenderPass renderPass ){
 	vkDestroyRenderPass( device, renderPass, nullptr );
 }
 
-vector<VkFramebuffer> initFramebuffers( VkDevice device, VkRenderPass renderPass, vector<VkImageView> imageViews, uint32_t width, uint32_t height ){
+vector<VkFramebuffer> initFramebuffers(
+	VkDevice device,
+	VkRenderPass renderPass,
+	vector<VkImageView> imageViews,
+	uint32_t width, uint32_t height
+){
 	vector<VkFramebuffer> framebuffers;
 
 	for( auto imageView : imageViews ){
@@ -1045,7 +1355,9 @@ VkShaderModule initShaderModule( VkDevice device, string filename ){
 	if( !ifs.is_open() ) throw string( "SPIR-V shader file failed to open: " ) + strerror( errno );
 	vector<char> shaderCode( (istreambuf_iterator<char>(ifs)), istreambuf_iterator<char>() /* EOS */ ); // Most Vexing Parse
 
-	if( shaderCode.empty() || shaderCode.size() % 4 != 0 /* per spec; % sizeof(uint32_t) presumably */ ) throw "SPIR-V shader file is invalid or read failed!";
+	if( shaderCode.empty() || shaderCode.size() % 4 != 0 /* per spec; % sizeof(uint32_t) presumably */ ){
+		throw "SPIR-V shader file is invalid or read failed!";
+	}
 
 	VkShaderModuleCreateInfo shaderModuleInfo{
 		VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
@@ -1087,7 +1399,15 @@ void killPipelineLayout( VkDevice device, VkPipelineLayout pipelineLayout ){
 	vkDestroyPipelineLayout( device, pipelineLayout, nullptr );
 }
 
-VkPipeline initPipeline( VkDevice device, VkPhysicalDeviceLimits limits, VkPipelineLayout pipelineLayout, VkRenderPass renderPass, VkShaderModule vertexShader, VkShaderModule fragmentShader, const uint32_t vertexBufferBinding ){
+VkPipeline initPipeline(
+	VkDevice device,
+	VkPhysicalDeviceLimits limits,
+	VkPipelineLayout pipelineLayout,
+	VkRenderPass renderPass,
+	VkShaderModule vertexShader,
+	VkShaderModule fragmentShader,
+	const uint32_t vertexBufferBinding
+){
 	const VkPipelineShaderStageCreateInfo vertexShaderStage{
 		VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
 		nullptr, // pNext
@@ -1111,8 +1431,17 @@ VkPipeline initPipeline( VkDevice device, VkPhysicalDeviceLimits limits, VkPipel
 	vector<VkPipelineShaderStageCreateInfo> shaderStageStates = { vertexShaderStage, fragmentShaderStage };
 
 	const uint32_t vertexBufferStride = sizeof( Vertex );
-	if( vertexBufferBinding > limits.maxVertexInputBindings ) throw string("Implementation does not allow enough input bindings. Needed: ") + to_string( vertexBufferBinding ) + string(", max: ") + to_string( limits.maxVertexInputBindings );
-	if( vertexBufferStride > limits.maxVertexInputBindingStride ) throw string("Implementation does not allow big enough vertex buffer stride: ") + to_string( vertexBufferStride ) + string(", max: ") + to_string( limits.maxVertexInputBindingStride );
+	if( vertexBufferBinding > limits.maxVertexInputBindings ){
+		throw string("Implementation does not allow enough input bindings. Needed: ")
+		    + to_string( vertexBufferBinding ) + string(", max: ")
+		    + to_string( limits.maxVertexInputBindings );
+	}
+	if( vertexBufferStride > limits.maxVertexInputBindingStride ){
+		throw string("Implementation does not allow big enough vertex buffer stride: ")
+		    + to_string( vertexBufferStride ) 
+		    + string(", max: ")
+		    + to_string( limits.maxVertexInputBindingStride );
+	}
 
 	VkVertexInputBindingDescription vertexInputBindingDescription{
 		vertexBufferBinding,
@@ -1121,13 +1450,19 @@ VkPipeline initPipeline( VkDevice device, VkPhysicalDeviceLimits limits, VkPipel
 	};
 
 	vector<VkVertexInputBindingDescription> inputBindingDescriptions = { vertexInputBindingDescription };
-	if( inputBindingDescriptions.size() > limits.maxVertexInputBindings ) throw "Implementation does not allow enough input bindings.";
+	if( inputBindingDescriptions.size() > limits.maxVertexInputBindings ){
+		throw "Implementation does not allow enough input bindings.";
+	}
 
 	const uint32_t positionLocation = 0;
 	const uint32_t colorLocation = 1;
 
-	if( colorLocation >= limits.maxVertexInputAttributes ) throw "Implementation does not allow enough input attributes.";
-	if( offsetof( Vertex, color ) > limits.maxVertexInputAttributeOffset ) throw "Implementation does not allow sufficient attribute offset.";
+	if( colorLocation >= limits.maxVertexInputAttributes ){
+		throw "Implementation does not allow enough input attributes.";
+	}
+	if( offsetof( Vertex, color ) > limits.maxVertexInputAttributeOffset ){
+		throw "Implementation does not allow sufficient attribute offset.";
+	}
 
 	VkVertexInputAttributeDescription positionInputAttributeDescription{
 		positionLocation,
@@ -1143,7 +1478,10 @@ VkPipeline initPipeline( VkDevice device, VkPhysicalDeviceLimits limits, VkPipel
 		offsetof( Vertex, color ) // offset in bytes
 	};
 
-	vector<VkVertexInputAttributeDescription> inputAttributeDescriptions = { positionInputAttributeDescription, colorInputAttributeDescription };
+	vector<VkVertexInputAttributeDescription> inputAttributeDescriptions = {
+		positionInputAttributeDescription,
+		colorInputAttributeDescription
+	};
 
 	VkPipelineVertexInputStateCreateInfo vertexInputState{
 		VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
@@ -1255,7 +1593,14 @@ VkPipeline initPipeline( VkDevice device, VkPhysicalDeviceLimits limits, VkPipel
 	};
 
 	VkPipeline pipeline;
-	VkResult errorCode = vkCreateGraphicsPipelines( device, VK_NULL_HANDLE /* pipeline cache */, 1 /* info count */, &pipelineInfo, nullptr, &pipeline ); RESULT_HANDLER( errorCode, "vkCreateGraphicsPipelines" );
+	VkResult errorCode = vkCreateGraphicsPipelines(
+		device,
+		VK_NULL_HANDLE /* pipeline cache */,
+		1 /* info count */,
+		&pipelineInfo,
+		nullptr,
+		&pipeline
+	); RESULT_HANDLER( errorCode, "vkCreateGraphicsPipelines" );
 	return pipeline;
 }
 
@@ -1265,71 +1610,8 @@ void killPipeline( VkDevice device, VkPipeline pipeline ){
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-VkBuffer initVertexBuffer( VkDevice device, const uint32_t queueFamily, VkDeviceSize size ){
-	VkBufferCreateInfo bufferInfo{
-		VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
-		nullptr, // pNext
-		0, // flags
-		size,
-		VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-		VK_SHARING_MODE_EXCLUSIVE,
-		1, // queue family count
-		&queueFamily
-	};
-
-	VkBuffer buffer;
-	VkResult errorCode = vkCreateBuffer( device, &bufferInfo, nullptr, &buffer ); RESULT_HANDLER( errorCode, "vkCreateBuffer" );
-	return buffer;
-}
-
-void killBuffer( VkDevice device, VkBuffer buffer ){
-	vkDestroyBuffer( device, buffer, nullptr );
-}
-
-
-VkDeviceMemory initBufferMemory( VkDevice device, VkPhysicalDeviceMemoryProperties physicalDeviceMemoryProperties, VkBuffer buffer, vector<Vertex> vertices ){
-	VkMemoryRequirements memoryRequirements;
-	vkGetBufferMemoryRequirements( device, buffer, &memoryRequirements );
-
-	uint32_t memoryType = 0;
-	bool found = false;
-
-	for( uint32_t i = 0; i < 32; ++i ){
-		if( memoryRequirements.memoryTypeBits & 0x1 ){
-			if( physicalDeviceMemoryProperties.memoryTypes[i].propertyFlags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT ){
-				memoryType = i;
-				found = true;
-				break;
-			}
-		}
-
-		memoryRequirements.memoryTypeBits >>= 1;
-	}
-
-	if( !found ) throw "Can't find compatible mappable memory for buffer";
-
-	VkMemoryAllocateInfo memoryInfo{
-		VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
-		nullptr, // pNext
-		memoryRequirements.size,
-		memoryType
-	};
-
-	VkDeviceMemory memory;
-	VkResult errorCode = vkAllocateMemory( device, &memoryInfo, nullptr, &memory ); RESULT_HANDLER( errorCode, "vkAllocateMemory" );
-
-	void* data;
-	errorCode = vkMapMemory( device, memory, 0 /*offset*/, VK_WHOLE_SIZE, 0 /*flags - reserved*/, &data ); RESULT_HANDLER( errorCode, "vkMapMemory" );
-	memcpy( data, vertices.data(), sizeof( decltype(vertices)::value_type ) * vertices.size() );
-	vkUnmapMemory( device, memory );
-
-	errorCode = vkBindBufferMemory( device, buffer, memory, 0 /*offset*/ ); RESULT_HANDLER( errorCode, "vkBindBufferMemory" );
-
-	return memory;
-}
-
-void killBufferMemory( VkDevice device, VkDeviceMemory memory ){
-	vkFreeMemory( device, memory, nullptr );
+void setVertexData( VkDevice device, VkDeviceMemory memory, vector<Vertex> vertices ){
+	setMemoryData(  device, memory, vertices.data(), sizeof( decltype(vertices)::value_type ) * vertices.size()  );
 }
 
 VkSemaphore initSemaphore( VkDevice device ){
@@ -1395,7 +1677,13 @@ void endCommandBuffer( VkCommandBuffer commandBuffer ){
 }
 
 
-void recordBeginRenderPass( VkCommandBuffer commandBuffer, VkRenderPass renderPass, VkFramebuffer framebuffer, VkClearValue clearValue, uint32_t width, uint32_t height ){
+void recordBeginRenderPass(
+	VkCommandBuffer commandBuffer,
+	VkRenderPass renderPass,
+	VkFramebuffer framebuffer,
+	VkClearValue clearValue,
+	uint32_t width, uint32_t height
+){
 	VkRenderPassBeginInfo renderPassInfo{
 		VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
 		nullptr, // pNext
@@ -1483,4 +1771,3 @@ void present( VkQueue queue, VkSwapchainKHR swapchain, uint32_t swapchainImageIn
 	VkResult errorCode = vkQueuePresentKHR( queue, &presentInfo ); RESULT_HANDLER( errorCode, "vkQueuePresentKHR" );
 	//RESULT_HANDLER( errorCodeSwapchain, "vkQueuePresentKHR" );
 }
-
