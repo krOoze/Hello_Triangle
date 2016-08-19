@@ -1,9 +1,17 @@
 // Vulkan hello world triangle rendering demo
 
 
-// Environment
-//////////////////
+// Global header settings
+//////////////////////////
+
 #define _CRT_SECURE_NO_WARNINGS
+
+#include "LeanWindowsEnvironment.h"
+#include "VulkanEnvironment.h"
+
+
+// Includes
+//////////////////////////
 
 #include <iostream>
 using std::cout;
@@ -37,23 +45,22 @@ using std::chrono::duration_cast;
 
 #include <cmath>
 
-#ifdef _WIN32
-	#define VK_USE_PLATFORM_WIN32_KHR
-#elif __CYGWIN__
-	#define VK_USE_PLATFORM_WIN32_KHR
-#else
-	#error "Unsupported platform"
-#endif
-#include "VulkanEnvironment.h"
+#include <algorithm>
+
+#include <vulkan/vulkan.h>
+
+#include "ErrorHandling.h"
+#include "Vertex.h"
 
 #ifdef VK_USE_PLATFORM_WIN32_KHR
-	#define PLATFORM_SURFACE_EXTENSION_NAME VK_KHR_WIN32_SURFACE_EXTENSION_NAME
+	#include "win32Platform.h"
 #endif
 
 // Config
 ///////////////////////
 
 // layers and debug
+TODO( "Should be also guarded by VK_EXT_debug_report" )
 #ifdef _DEBUG
 constexpr bool debugVulkan = true;
 constexpr VkDebugReportFlagsEXT debugAmount =
@@ -79,38 +86,11 @@ constexpr VkClearValue clearColor = { {0.1f, 0.1f, 0.1f, 1.0f} };
 const char* vertexShaderFilename = "triangle.vert.spv";
 const char* fragmentShaderFilename = "triangle.frag.spv";
 
-// Error handling
-//////////////////////
-
-struct VulkanResultException{
-	const char* file;
-	unsigned line;
-	const char* func;
-	const char* source;
-	VkResult result;
-
-	VulkanResultException( const char* file, unsigned line, const char* func, const char* source, VkResult result )
-	: file( file ), line( line ), func( func ), source( source ), result( result ){}
-};
-
-#define RESULT_HANDLER( errorCode, source )  if( errorCode ) throw VulkanResultException( __FILE__, __LINE__, __func__, source, errorCode )
-#define RESULT_HANDLER_EX( cond, errorCode, source )  if( cond ) throw VulkanResultException( __FILE__, __LINE__, __func__, source, errorCode )
-
-const char* to_string( VkResult r );
-
 // needed stuff -- forward declarations
 ///////////////////////////////
-struct Vertex { float position[2]; float color[3]; };
-
 
 VkInstance initInstance( const vector<const char*> layers = {}, const vector<const char*> extensions = {} );
 void killInstance( VkInstance instance );
-
-void loadVulkanExtensions( VkInstance instance );
-
-VkDebugReportCallbackEXT initDebug( VkInstance instance );
-void killDebug( VkInstance instance, VkDebugReportCallbackEXT debug );
-
 
 VkPhysicalDevice getPhysicalDevice( VkInstance instance ); // destroyed with instance
 VkPhysicalDeviceProperties getPhysicalDeviceProperties( VkPhysicalDevice physicalDevice );
@@ -121,12 +101,6 @@ uint32_t getQueueFamily( VkPhysicalDevice physDevice );
 VkDevice initDevice(
 	VkPhysicalDevice physDevice,
 	const VkPhysicalDeviceFeatures& features,
-	uint32_t queueFamilyIndex,
-	vector<const char*> layers = {},
-	vector<const char*> extensions = {}
-);
-VkDevice initDevice( // for all features
-	VkPhysicalDevice physDevice,
 	uint32_t queueFamilyIndex,
 	vector<const char*> layers = {},
 	vector<const char*> extensions = {}
@@ -164,15 +138,7 @@ void killImage( VkDevice device, VkImage image );
 VkImageView initImageView( VkDevice device, VkImage image, VkFormat format );
 void killImageView( VkDevice device, VkImageView imageView );
 
-
-#ifdef VK_USE_PLATFORM_WIN32_KHR
-struct PlatformWindow{ HINSTANCE hInstance; ATOM wndClass; HWND hWnd; };
-#endif
-
-PlatformWindow initWindow( int canvasWidth, int canvasHeight );
-void killWindow( PlatformWindow window );
-
-VkSurfaceKHR initSurface( VkInstance instance, VkPhysicalDevice physicalDevice, uint32_t queueFamily, PlatformWindow window );
+// initSurface() is platform dependent
 void killSurface( VkInstance instance, VkSurfaceKHR surface );
 
 VkSurfaceCapabilitiesKHR getSurfaceCapabilities( VkPhysicalDevice physicalDevice, VkSurfaceKHR surface );
@@ -219,7 +185,7 @@ VkPipeline initPipeline(
 void killPipeline( VkDevice device, VkPipeline pipeline );
 
 
-void setVertexData( VkDevice device, VkDeviceMemory memory, vector<Vertex> vertices );
+void setVertexData( VkDevice device, VkDeviceMemory memory, vector<Vertex2D_ColorF_pack> vertices );
 
 VkSemaphore initSemaphore( VkDevice device );
 void killSemaphore( VkDevice device, VkSemaphore semaphore );
@@ -246,12 +212,12 @@ void recordBindVertexBuffer( VkCommandBuffer commandBuffer, const uint32_t verte
 void recordSetViewport( VkCommandBuffer commandBuffer, uint32_t width, uint32_t height );
 void recordSetScissor( VkCommandBuffer commandBuffer, uint32_t width, uint32_t height );
 
-void recordDraw( VkCommandBuffer commandBuffer, const vector<Vertex> vertices );
+void recordDraw( VkCommandBuffer commandBuffer, const vector<Vertex2D_ColorF_pack> vertices );
 
 void submitToQueue( VkQueue queue, VkCommandBuffer commandBuffer, VkSemaphore imageReadyS, VkSemaphore renderDoneS );
 void present( VkQueue queue, VkSwapchainKHR swapchain, uint32_t swapchainImageIndex, VkSemaphore renderDoneS );
 
-int messageLoop( bool& quit );
+
 
 // main()!
 ////////////////////////
@@ -260,7 +226,7 @@ int main() try{
 	const uint32_t vertexBufferBinding = 0;
 
 	const float triangleSize = 1.6f;
-	vector<Vertex> triangle = {
+	vector<Vertex2D_ColorF_pack> triangle = {
 		{ /*rb*/ {  0.5f * triangleSize,  sqrtf( 3.0f ) * 0.25f * triangleSize }, /*R*/{ 1.0f, 0.0f, 0.0f }  },
 		{ /* t*/ {                 0.0f, -sqrtf( 3.0f ) * 0.25f * triangleSize }, /*G*/{ 0.0f, 1.0f, 0.0f }  },
 		{ /*lb*/ { -0.5f * triangleSize,  sqrtf( 3.0f ) * 0.25f * triangleSize }, /*B*/{ 0.0f, 0.0f, 1.0f }  }
@@ -269,19 +235,25 @@ int main() try{
 	vector<const char*> layers;
 	if( ::debugVulkan ) layers.push_back( "VK_LAYER_LUNARG_standard_validation" );
 
+	vector<const char*> instanceExtensions = {VK_KHR_SURFACE_EXTENSION_NAME, PLATFORM_SURFACE_EXTENSION_NAME};
+	if( ::debugVulkan ) instanceExtensions.push_back( VK_EXT_DEBUG_REPORT_EXTENSION_NAME );
+
 	VkInstance instance = initInstance(
 		layers,
-		{VK_KHR_SURFACE_EXTENSION_NAME, PLATFORM_SURFACE_EXTENSION_NAME, VK_EXT_DEBUG_REPORT_EXTENSION_NAME}
+		instanceExtensions
 	);
-	loadVulkanExtensions( instance );
-	VkDebugReportCallbackEXT debug = ::debugVulkan ? initDebug( instance ) : VK_NULL_HANDLE;
+
+	VkDebugReportCallbackEXT debug = ::debugVulkan ? initDebug( instance, ::debugAmount ) : VK_NULL_HANDLE;
 
 	VkPhysicalDevice physicalDevice = getPhysicalDevice( instance );
+	VkPhysicalDeviceFeatures features = {}; // don't need anything for this demo
 	VkPhysicalDeviceProperties physicalDeviceProperties = getPhysicalDeviceProperties( physicalDevice );
 	VkPhysicalDeviceMemoryProperties physicalDeviceMemoryProperties = getPhysicalDeviceMemoryProperties( physicalDevice );
 	uint32_t queueFamily = getQueueFamily( physicalDevice );
 	VkDevice device = initDevice(
-		physicalDevice, queueFamily,
+		physicalDevice,
+		features,
+		queueFamily,
 		layers,
 		{VK_KHR_SWAPCHAIN_EXTENSION_NAME}
 	);
@@ -348,6 +320,10 @@ int main() try{
 		endCommandBuffer( commandBuffers[i] );
 	}
 
+	// might need synchronization if init is more advanced than this
+	//VkResult errorCode = vkDeviceWaitIdle( device ); RESULT_HANDLER( errorCode, "vkDeviceWaitIdle" );
+
+	// lets have simple non-robust performance info for fun
 	unsigned frames = 0;
 	steady_clock::time_point start = steady_clock::now();
 
@@ -356,7 +332,6 @@ int main() try{
 		ret = messageLoop( quit ); // process all available events
 
 		// Rendering! Yay!
-		//VkResult errorCode = vkQueueWaitIdle( queue ); RESULT_HANDLER( errorCode, "vkQueueWaitIdle" );
 		uint32_t nextSwapchainImageIndex = getNextImageIndex( device, swapchain, imageReadyS );
 		submitToQueue( queue, commandBuffers[nextSwapchainImageIndex], imageReadyS, renderDoneS );
 		present( queue, swapchain, nextSwapchainImageIndex, renderDoneS );
@@ -366,10 +341,9 @@ int main() try{
 	VkResult errorCode = vkDeviceWaitIdle( device ); RESULT_HANDLER( errorCode, "vkDeviceWaitIdle" );
 
 	steady_clock::time_point end = steady_clock::now();
-
 	duration<double> time_span = duration_cast<duration<double>>( end - start );
-
 	cout << "Rendered " << frames << " frames in " << time_span.count() << " seconds. Average FPS is " << frames / time_span.count() << endl;
+
 
 	killCommandPool( device,  commandPool );
 
@@ -419,280 +393,20 @@ catch( ... ){
 }
 
 
-#if defined(_WIN32) || defined(__CYGWIN__)
-// In case of non console subsystem just relay to main()
-int CALLBACK WinMain( _In_ HINSTANCE hInstance, _In_ HINSTANCE hPrevInstance, _In_ LPSTR lpCmdLine, _In_ int nCmdShow ){
-	UNREFERENCED_PARAMETER( hInstance );
-	UNREFERENCED_PARAMETER( hPrevInstance );
-	UNREFERENCED_PARAMETER( lpCmdLine );
-	UNREFERENCED_PARAMETER( nCmdShow );
-
-	return main();
-}
-#endif
-
-// Platform dependent implementation
+// Implementation
 //////////////////////////////////
-#ifdef VK_USE_PLATFORM_WIN32_KHR
-int messageLoop( bool& quit ){
-	MSG msg;
-
-	while(  PeekMessageW( &msg, NULL, 0, 0, PM_REMOVE )  ){ // peek does not block on empty queue!
-		if( msg.message != WM_QUIT ){
-			TranslateMessage( &msg );
-			DispatchMessageW( &msg ); //dispatch to wndProc; ignore return from wndProc
-		}
-		else{
-			quit = true;
-			return static_cast<int>( msg.wParam );
-		}
-	}
-
-	return EXIT_SUCCESS;
-}
-
-LRESULT CALLBACK wndProc( HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam ){
-	UNREFERENCED_PARAMETER( lParam );
-
-	switch( uMsg ){
-	case WM_CLOSE:
-		PostQuitMessage( 0 );
-		return 0;
-
-	case WM_PAINT:
-		//ValidateRect( window, NULL );
-		return DefWindowProc( hWnd, uMsg, wParam, lParam );
-
-	case WM_KEYDOWN:
-		switch( wParam ){
-		case VK_ESCAPE:
-			PostQuitMessage( 0 );
-			return 0;
-		}
-		return 0;
-
-	default:
-		return DefWindowProc( hWnd, uMsg, wParam, lParam );
-	}
-}
-
-
-bool presentationSupport( VkPhysicalDevice device, uint32_t queueFamilyIndex ){
-	return vkGetPhysicalDeviceWin32PresentationSupportKHR( device, queueFamilyIndex ) == VK_TRUE;
-}
-
-PlatformWindow initWindow( int canvasWidth, int canvasHeight ){
-	HINSTANCE hInstance = GetModuleHandleW( NULL );
-
-	static unsigned uniqueCounter = 0;
-	if( uniqueCounter == 1000 ) throw "What the is wrong with you... I mean: too many window class registrations made!";
-	std::wstring className =  L"vkwc" + std::to_wstring( uniqueCounter++ );
-	WNDCLASSEXW windowClass = {
-		sizeof( WNDCLASSEXW ), // cbSize
-		/*CS_OWNDC |*/ CS_HREDRAW | CS_VREDRAW, // style - some window behavior
-		wndProc, // lpfnWndProc - set event handler
-		0, // cbClsExtra - set 0 extra bytes after class
-		0, // cbWndExtra - set 0 extra bytes after class instance
-		hInstance, // hInstance
-		LoadIconW( NULL, IDI_APPLICATION ), // hIcon - application icon
-		LoadCursorW( NULL, IDC_ARROW ), // hCursor - cursor inside
-		(HBRUSH)COLOR_WINDOW, // hbrBackground - no background prepainting
-		NULL, // lpszMenuName - menu class name
-		className.c_str(), // lpszClassName - window class name/identificator
-		LoadIconW( NULL, IDI_APPLICATION /*IDI_WINLOGO*/ ) // hIconSm
-	};
-
-	// register window class
-	ATOM classAtom = RegisterClassExW( &windowClass );
-	if( !classAtom ){
-		throw string( "Trouble registering window class: " ) + to_string( GetLastError() );
-	}
-
-	// adjust size of window to contain given size canvas
-	DWORD style = (WS_OVERLAPPEDWINDOW & ~WS_SIZEBOX & ~WS_MAXIMIZEBOX) | WS_CLIPCHILDREN | WS_CLIPSIBLINGS;
-	DWORD exStyle = WS_EX_OVERLAPPEDWINDOW;
-	RECT windowRect = { 0, 0, canvasWidth, canvasHeight };
-	if(  !AdjustWindowRectEx( &windowRect, style, FALSE, exStyle )  ){
-		throw string( "Trouble adjusting window size: " ) + to_string( GetLastError() );
-	}
-
-	// create window instance
-	HWND hWnd =  CreateWindowExW(
-		exStyle,
-		MAKEINTATOM(classAtom),
-		TEXT("Vulkan Test - Hello"),
-		style,
-		CW_USEDEFAULT, CW_USEDEFAULT,
-		windowRect.right - windowRect.left, windowRect.bottom - windowRect.top,
-		NULL,
-		NULL,
-		hInstance,
-		NULL
-	);
-	if( !hWnd  ){
-		throw string( "Trouble creating window instance: " ) + to_string( GetLastError() );
-	}
-
-	ShowWindow( hWnd, SW_SHOW );
-	SetForegroundWindow( hWnd );
-
-	return { hInstance, classAtom, hWnd };
-}
-
-void killWindow( PlatformWindow window ){
-	if(  !DestroyWindow( window.hWnd )  ) throw string( "Trouble destroying window instance: " ) + to_string( GetLastError() );
-	if(  !UnregisterClassW( MAKEINTATOM(window.wndClass), window.hInstance )  ){
-		throw string( "Trouble unregistering window class: " ) + to_string( GetLastError() );
-	}
-}
-
-VkSurfaceKHR initSurface( VkInstance instance, VkPhysicalDevice physicalDevice, uint32_t queueFamily, PlatformWindow window ){
-	VkWin32SurfaceCreateInfoKHR surfaceInfo{
-		VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR,
-		nullptr, // pNext for extensions use
-		0, // flags - reserved for future use
-		window.hInstance,
-		window.hWnd
-	};
-
-
-	VkSurfaceKHR surface;
-	VkResult errorCode = vkCreateWin32SurfaceKHR( instance, &surfaceInfo, nullptr, &surface ); RESULT_HANDLER( errorCode, "vkCreateWin32SurfaceKHR" );
-
-	// validate WSI support
-	VkBool32 supported;
-	errorCode = vkGetPhysicalDeviceSurfaceSupportKHR( physicalDevice, queueFamily, surface, &supported ); RESULT_HANDLER( errorCode, "vkGetPhysicalDeviceSurfaceSupportKHR" );
-	if( !supported ) throw "Selected queue family of physical device can't present to the surface!";
-
-	return surface;
-}
 
 void killSurface( VkInstance instance, VkSurfaceKHR surface ){
 	vkDestroySurfaceKHR( instance, surface, nullptr );
 }
-#endif
-
-
-// Implementation
-//////////////////////////////////
-const char* to_string( VkResult r ){
-	switch( r ){
-		case VK_SUCCESS: return "VK_SUCCESS";
-		case VK_NOT_READY: return "VK_NOT_READY";
-		case VK_TIMEOUT: return "VK_TIMEOUT";
-		case VK_EVENT_SET: return "VK_EVENT_SET";
-		case VK_EVENT_RESET: return "VK_EVENT_RESET";
-		case VK_INCOMPLETE: return "VK_INCOMPLETE";
-		case VK_ERROR_OUT_OF_HOST_MEMORY: return "VK_ERROR_OUT_OF_HOST_MEMORY";
-		case VK_ERROR_OUT_OF_DEVICE_MEMORY: return "VK_ERROR_OUT_OF_DEVICE_MEMORY";
-		case VK_ERROR_INITIALIZATION_FAILED: return "VK_ERROR_INITIALIZATION_FAILED";
-		case VK_ERROR_DEVICE_LOST: return "VK_ERROR_DEVICE_LOST";
-		case VK_ERROR_MEMORY_MAP_FAILED: return "VK_ERROR_MEMORY_MAP_FAILED";
-		case VK_ERROR_LAYER_NOT_PRESENT: return "VK_ERROR_LAYER_NOT_PRESENT";
-		case VK_ERROR_EXTENSION_NOT_PRESENT: return "VK_ERROR_EXTENSION_NOT_PRESENT";
-		case VK_ERROR_FEATURE_NOT_PRESENT: return "VK_ERROR_FEATURE_NOT_PRESENT";
-		case VK_ERROR_INCOMPATIBLE_DRIVER: return "VK_ERROR_INCOMPATIBLE_DRIVER";
-		case VK_ERROR_TOO_MANY_OBJECTS: return "VK_ERROR_TOO_MANY_OBJECTS";
-		case VK_ERROR_FORMAT_NOT_SUPPORTED: return "VK_ERROR_FORMAT_NOT_SUPPORTED";
-		case VK_ERROR_SURFACE_LOST_KHR: return "VK_ERROR_SURFACE_LOST_KHR";
-		case VK_ERROR_NATIVE_WINDOW_IN_USE_KHR: return "VK_ERROR_NATIVE_WINDOW_IN_USE_KHR";
-		case VK_SUBOPTIMAL_KHR: return "VK_SUBOPTIMAL_KHR";
-		case VK_ERROR_OUT_OF_DATE_KHR: return "VK_ERROR_OUT_OF_DATE_KHR";
-		case VK_ERROR_INCOMPATIBLE_DISPLAY_KHR: return "VK_ERROR_INCOMPATIBLE_DISPLAY_KHR";
-		case VK_ERROR_VALIDATION_FAILED_EXT: return "VK_ERROR_VALIDATION_FAILED_EXT";
-		case VK_ERROR_INVALID_SHADER_NV: return "VK_ERROR_INVALID_SHADER_NV";
-		default: return "unrecognized VkResult code";
-	}
-}
-
-const char* to_string( VkDebugReportObjectTypeEXT o ){
-	switch( o ){
-		case VK_DEBUG_REPORT_OBJECT_TYPE_UNKNOWN_EXT: return "unknown";
-		case VK_DEBUG_REPORT_OBJECT_TYPE_INSTANCE_EXT: return "Instance";
-		case VK_DEBUG_REPORT_OBJECT_TYPE_PHYSICAL_DEVICE_EXT: return "PhysicalDevice";
-		case VK_DEBUG_REPORT_OBJECT_TYPE_DEVICE_EXT: return "Device";
-		case VK_DEBUG_REPORT_OBJECT_TYPE_QUEUE_EXT: return "Queue";
-		case VK_DEBUG_REPORT_OBJECT_TYPE_SEMAPHORE_EXT: return "Semaphore";
-		case VK_DEBUG_REPORT_OBJECT_TYPE_COMMAND_BUFFER_EXT: return "CommandBuffer";
-		case VK_DEBUG_REPORT_OBJECT_TYPE_FENCE_EXT: return "Fence";
-		case VK_DEBUG_REPORT_OBJECT_TYPE_DEVICE_MEMORY_EXT: return "DeviceMemory";
-		case VK_DEBUG_REPORT_OBJECT_TYPE_BUFFER_EXT: return "Buffer";
-		case VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_EXT: return "Image";
-		case VK_DEBUG_REPORT_OBJECT_TYPE_EVENT_EXT: return "Event";
-		case VK_DEBUG_REPORT_OBJECT_TYPE_QUERY_POOL_EXT: return "QueryPool";
-		case VK_DEBUG_REPORT_OBJECT_TYPE_BUFFER_VIEW_EXT: return "BufferView";
-		case VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_VIEW_EXT: return "ImageView";
-		case VK_DEBUG_REPORT_OBJECT_TYPE_SHADER_MODULE_EXT: return "ShaderModule";
-		case VK_DEBUG_REPORT_OBJECT_TYPE_PIPELINE_CACHE_EXT: return "PipelineCache";
-		case VK_DEBUG_REPORT_OBJECT_TYPE_PIPELINE_LAYOUT_EXT: return "PipelineLayout";
-		case VK_DEBUG_REPORT_OBJECT_TYPE_RENDER_PASS_EXT: return "RenderPass";
-		case VK_DEBUG_REPORT_OBJECT_TYPE_PIPELINE_EXT: return "Pipeline";
-		case VK_DEBUG_REPORT_OBJECT_TYPE_DESCRIPTOR_SET_LAYOUT_EXT: return "DescriptorSetLayout";
-		case VK_DEBUG_REPORT_OBJECT_TYPE_SAMPLER_EXT: return "Sampler";
-		case VK_DEBUG_REPORT_OBJECT_TYPE_DESCRIPTOR_POOL_EXT: return "DescriptorPool";
-		case VK_DEBUG_REPORT_OBJECT_TYPE_DESCRIPTOR_SET_EXT: return "DescriptorSet";
-		case VK_DEBUG_REPORT_OBJECT_TYPE_FRAMEBUFFER_EXT: return "Framebuffer";
-		case VK_DEBUG_REPORT_OBJECT_TYPE_COMMAND_POOL_EXT: return "Command pool";
-		case VK_DEBUG_REPORT_OBJECT_TYPE_SURFACE_KHR_EXT: return "SurfaceKHR";
-		case VK_DEBUG_REPORT_OBJECT_TYPE_SWAPCHAIN_KHR_EXT: return "SwapchainKHR";
-		case VK_DEBUG_REPORT_OBJECT_TYPE_DEBUG_REPORT_EXT: return "DebugReport";
-		default: return "unrecognized";
-	}
-}
-
-static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
-	VkFlags msgFlags,
-	VkDebugReportObjectTypeEXT objType,
-	uint64_t srcObject,
-	size_t /*location*/,
-	int32_t msgCode,
-	const char* pLayerPrefix,
-	const char* pMsg,
-	void* /*pUserData*/
-){
-
-	string report = to_string( objType ) + to_string( srcObject ) + ": " + to_string( msgCode ) + ", " + pLayerPrefix + ", " + pMsg;;
-
-	switch( msgFlags ){
-		case VK_DEBUG_REPORT_INFORMATION_BIT_EXT:
-			cout << "Info: " << report << endl;
-			break;
-
-		case VK_DEBUG_REPORT_WARNING_BIT_EXT:
-			cout << "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n";
-			cout << "WARNING: " << report << endl;
-			cout << "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n";
-			break;
-
-		case VK_DEBUG_REPORT_PERFORMANCE_WARNING_BIT_EXT:
-			cout << "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n";
-			cout << "PERFORMANCE: " << report << endl;;
-			cout << "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n";
-			break;
-
-		case VK_DEBUG_REPORT_ERROR_BIT_EXT:
-			cout << "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n";
-			cout << "ERROR: " << report << endl;;
-			cout << "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n";
-			break;
-
-		case VK_DEBUG_REPORT_DEBUG_BIT_EXT:
-			report += "Debug: ";
-			break;
-	}
-
-	// no abort on misbehaving function
-	return VK_FALSE;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 VkInstance initInstance( const vector<const char*> layers, const vector<const char*> extensions ){
 	VkApplicationInfo appInfo = {};
 	appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
-	appInfo.pApplicationName = u8"vulkanTest";
-	appInfo.pEngineName = u8"myEngine";
+	appInfo.pApplicationName = u8"Hello Vulkan Triangle";
 	appInfo.apiVersion = 0; // 0 should accept any version
+
+	TODO( "Should make a warning if Vulkan version is not the expected 1.0" )
 
 	VkInstanceCreateInfo instanceInfo{
 		VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
@@ -705,11 +419,12 @@ VkInstance initInstance( const vector<const char*> layers, const vector<const ch
 		extensions.data()
 	};
 
+
 	VkDebugReportCallbackCreateInfoEXT debugCreateInfo{
 		VK_STRUCTURE_TYPE_DEBUG_REPORT_CREATE_INFO_EXT,
 		nullptr,
 		::debugAmount,
-		debugCallback,
+		genericDebugCallback,
 		nullptr
 	};
 
@@ -717,72 +432,17 @@ VkInstance initInstance( const vector<const char*> layers, const vector<const ch
 		instanceInfo.pNext = &debugCreateInfo; // valid just for createInstance/destroyInstance execution
 	}
 
+
 	VkInstance instance;
 	VkResult errorCode = vkCreateInstance( &instanceInfo, nullptr, &instance ); RESULT_HANDLER( errorCode, "vkCreateInstance" );
+
+	TODO( "On layer and extension failure should enumerate them and give useful error message" )
 
 	return instance;
 }
 
 void killInstance( VkInstance instance ){
 	vkDestroyInstance( instance, nullptr );
-}
-
-PFN_vkCreateDebugReportCallbackEXT fpCreateDebugReportCallbackEXT = nullptr;
-VKAPI_ATTR VkResult VKAPI_CALL vkCreateDebugReportCallbackEXT(
-	VkInstance instance,
-	const VkDebugReportCallbackCreateInfoEXT* pCreateInfo,
-	const VkAllocationCallbacks* pAllocator,
-	VkDebugReportCallbackEXT* pCallback
-){
-	return fpCreateDebugReportCallbackEXT( instance, pCreateInfo, pAllocator, pCallback );
-}
-
-PFN_vkDestroyDebugReportCallbackEXT fpDestroyDebugReportCallbackEXT = nullptr;
-VKAPI_ATTR void VKAPI_CALL vkDestroyDebugReportCallbackEXT(
-	VkInstance instance,
-	VkDebugReportCallbackEXT callback,
-	const VkAllocationCallbacks* pAllocator
-){
-	fpDestroyDebugReportCallbackEXT( instance, callback, pAllocator );
-}
-
-PFN_vkDebugReportMessageEXT fpDebugReportMessageEXT = nullptr;
-VKAPI_ATTR void VKAPI_CALL vkDebugReportMessageEXT(
-	VkInstance instance,
-	VkDebugReportFlagsEXT flags,
-	VkDebugReportObjectTypeEXT objectType,
-	uint64_t object,
-	size_t location,
-	int32_t messageCode,
-	const char* pLayerPrefix,
-	const char* pMessage
-){
-	fpDebugReportMessageEXT( instance, flags, objectType, object, location, messageCode, pLayerPrefix, pMessage );
-}
-
-void loadVulkanExtensions( VkInstance instance ){
-	fpCreateDebugReportCallbackEXT = (PFN_vkCreateDebugReportCallbackEXT)vkGetInstanceProcAddr( instance, "vkCreateDebugReportCallbackEXT" );
-	fpDestroyDebugReportCallbackEXT = (PFN_vkDestroyDebugReportCallbackEXT)vkGetInstanceProcAddr( instance, "vkDestroyDebugReportCallbackEXT" );
-	fpDebugReportMessageEXT = (PFN_vkDebugReportMessageEXT)vkGetInstanceProcAddr( instance, "vkDebugReportMessageEXT" );
-}
-
-VkDebugReportCallbackEXT initDebug( VkInstance instance ){
-	VkDebugReportCallbackCreateInfoEXT debugCreateInfo{
-		VK_STRUCTURE_TYPE_DEBUG_REPORT_CREATE_INFO_EXT,
-		nullptr,
-		::debugAmount,
-		debugCallback,
-		nullptr
-	};
-
-	VkDebugReportCallbackEXT debug;
-	VkResult errorCode = vkCreateDebugReportCallbackEXT( instance, &debugCreateInfo, nullptr, &debug ); RESULT_HANDLER( errorCode, "vkCreateDebugReportCallbackEXT" );
-
-	return debug;
-}
-
-void killDebug( VkInstance instance, VkDebugReportCallbackEXT debug ){
-	vkDestroyDebugReportCallbackEXT( instance, debug, nullptr );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -812,6 +472,7 @@ VkPhysicalDevice getPhysicalDevice( VkInstance instance ){
 		cout << "WARNING: More than one VkPhysicalDevice found - just picking the first one.\n";
 	}
 
+	TODO( "Should try to pick the best, not first" )
 	return devices[0];
 }
 
@@ -842,17 +503,17 @@ vector<VkQueueFamilyProperties> getQueueFamilyProperties( VkPhysicalDevice devic
 uint32_t getQueueFamily( VkPhysicalDevice physDevice ){
 	auto qfps = getQueueFamilyProperties( physDevice );
 	uint32_t qfi = 0;
-	while(  !( qfps[qfi].queueFlags & VK_QUEUE_GRAPHICS_BIT )  ) ++qfi;
 
-	if(  !presentationSupport( physDevice, qfi )  ) throw "Selected queue family of physical device can't present to a surface!";
+	for( ; qfi < qfps.size(); ++qfi ){
+		if( qfps[qfi].queueFlags & VK_QUEUE_GRAPHICS_BIT ){
+			TODO( "Might need some platform dependent stuff passed" )
+			if(  presentationSupport( physDevice, qfi )  ){
+				return qfi;
+			}
+		}
+	}
 
-	return qfi;
-}
-
-VkDevice initDevice( VkPhysicalDevice physDevice, uint32_t queueFamilyIndex, vector<const char*> layers, vector<const char*> extensions ){
-	VkPhysicalDeviceFeatures ft;
-	vkGetPhysicalDeviceFeatures( physDevice, &ft ); // all features
-	return initDevice( physDevice, ft, queueFamilyIndex, layers, extensions );
+	throw "Can't find a queue family supporting both graphics + present operations!";
 }
 
 VkDevice initDevice(
@@ -1153,17 +814,28 @@ VkSwapchainKHR initSwapchain( VkPhysicalDevice physicalDevice, VkDevice device, 
 	if(  !( capabilities.supportedUsageFlags & VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT )  ){
 		throw "VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT not supported!";
 	}
-	// TODO: perhaps not really necessary
+
+	TODO( "Perhaps not really necessary to have VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR" )
 	if(  !( capabilities.supportedCompositeAlpha & VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR )  ){
 		throw "VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR not supported!";
 	}
+
+	// for all modes having at least two Images can be beneficial
+	uint32_t minImageCount = std::min<uint32_t>(
+		capabilities.maxImageCount,
+		std::max<uint32_t>(
+			2,
+			capabilities.minImageCount
+		)
+	);
+
 
 	VkSwapchainCreateInfoKHR swapchainInfo{
 		VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
 		nullptr, // pNext for extensions use
 		0, // flags - reserved for future use
 		surface,
-		capabilities.minImageCount, // minImageCount
+		minImageCount, // minImageCount
 		surfaceFormat.format,
 		surfaceFormat.colorSpace,
 		capabilities.currentExtent,
@@ -1430,7 +1102,7 @@ VkPipeline initPipeline(
 
 	vector<VkPipelineShaderStageCreateInfo> shaderStageStates = { vertexShaderStage, fragmentShaderStage };
 
-	const uint32_t vertexBufferStride = sizeof( Vertex );
+	const uint32_t vertexBufferStride = sizeof( Vertex2D_ColorF_pack );
 	if( vertexBufferBinding > limits.maxVertexInputBindings ){
 		throw string("Implementation does not allow enough input bindings. Needed: ")
 		    + to_string( vertexBufferBinding ) + string(", max: ")
@@ -1445,7 +1117,7 @@ VkPipeline initPipeline(
 
 	VkVertexInputBindingDescription vertexInputBindingDescription{
 		vertexBufferBinding,
-		sizeof( Vertex ), // stride in bytes
+		sizeof( Vertex2D_ColorF_pack ), // stride in bytes
 		VK_VERTEX_INPUT_RATE_VERTEX
 	};
 
@@ -1460,7 +1132,7 @@ VkPipeline initPipeline(
 	if( colorLocation >= limits.maxVertexInputAttributes ){
 		throw "Implementation does not allow enough input attributes.";
 	}
-	if( offsetof( Vertex, color ) > limits.maxVertexInputAttributeOffset ){
+	if( offsetof( Vertex2D_ColorF_pack, color ) > limits.maxVertexInputAttributeOffset ){
 		throw "Implementation does not allow sufficient attribute offset.";
 	}
 
@@ -1468,14 +1140,14 @@ VkPipeline initPipeline(
 		positionLocation,
 		vertexBufferBinding,
 		VK_FORMAT_R32G32_SFLOAT,
-		offsetof( Vertex, position ) // offset in bytes
+		offsetof( Vertex2D_ColorF_pack, position ) // offset in bytes
 	};
 
 	VkVertexInputAttributeDescription colorInputAttributeDescription{
 		colorLocation,
 		vertexBufferBinding,
 		VK_FORMAT_R32G32B32_SFLOAT,
-		offsetof( Vertex, color ) // offset in bytes
+		offsetof( Vertex2D_ColorF_pack, color ) // offset in bytes
 	};
 
 	vector<VkVertexInputAttributeDescription> inputAttributeDescriptions = {
@@ -1524,7 +1196,7 @@ VkPipeline initPipeline(
 		0.0f, // bias constant factor
 		0.0f, // bias clamp
 		0.0f, // bias slope factor
-		0.0f // line width
+		1.0f // line width
 	};
 
 	VkPipelineMultisampleStateCreateInfo multisampleState{
@@ -1610,7 +1282,8 @@ void killPipeline( VkDevice device, VkPipeline pipeline ){
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void setVertexData( VkDevice device, VkDeviceMemory memory, vector<Vertex> vertices ){
+void setVertexData( VkDevice device, VkDeviceMemory memory, vector<Vertex2D_ColorF_pack> vertices ){
+	TODO( "Should be in Device Local memory instead" )
 	setMemoryData(  device, memory, vertices.data(), sizeof( decltype(vertices)::value_type ) * vertices.size()  );
 }
 
@@ -1665,6 +1338,7 @@ void beginCommandBuffer( VkCommandBuffer commandBuffer ){
 	VkCommandBufferBeginInfo commandBufferInfo{
 		VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
 		nullptr, // pNext
+		// same buffer can be re-executed before it finishes from last submit
 		VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT, // flags
 		nullptr // inheritance
 	};
@@ -1732,7 +1406,7 @@ void recordSetScissor( VkCommandBuffer commandBuffer, uint32_t width, uint32_t h
 	vkCmdSetScissor( commandBuffer, 0 /*first*/, 1 /*count*/, &scissor );
 }
 
-void recordDraw( VkCommandBuffer commandBuffer, const vector<Vertex> vertices ){
+void recordDraw( VkCommandBuffer commandBuffer, const vector<Vertex2D_ColorF_pack> vertices ){
 	vkCmdDraw( commandBuffer, static_cast<uint32_t>( vertices.size() ), 1 /*instance count*/, 0 /*first vertex*/, 0 /*first instance*/ );
 }
 

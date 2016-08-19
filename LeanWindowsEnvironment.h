@@ -1,16 +1,13 @@
-// Includes Windows.h as lean as possible for given task.
-// !!! Potentialy dangerous! Can break other code! !!!
+// As lean as possible Windows.h header global settings
 
-
+// Should be included as soon as possible (first line in translation unit preferably)
 
 #ifndef COMMON_LEAN_WINDOWS_ENVIRONMENT_H
-
-/*
-#ifdef _INC_WINDOWS
-	#error Some other Windows.h is already included before this file!
-#endif //_INC_WINDOWS
-*/
 #define COMMON_LEAN_WINDOWS_ENVIRONMENT_H
+
+#ifdef _INC_WINDOWS
+	#error Some Windows.h is already included before this file!
+#endif //_INC_WINDOWS
 
 
 #define WIN32_LEAN_AND_MEAN
@@ -55,10 +52,9 @@
 #define NODEFERWINDOWPOS
 #define NOMCX
 
+// rip ANSI mode
 #ifndef UNICODE
 	#define UNICODE
 #endif
-#include <Windows.h>
-
 
 #endif //COMMON_LEAN_WINDOWS_ENVIRONMENT_H
