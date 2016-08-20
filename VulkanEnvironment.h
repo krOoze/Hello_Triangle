@@ -15,6 +15,8 @@
 	#define VK_USE_PLATFORM_WIN32_KHR
 #elif __CYGWIN__
 	#define VK_USE_PLATFORM_WIN32_KHR
+#elif  __MINGW32__
+	#define VK_USE_PLATFORM_WIN32_KHR
 #else
 	#error "Unsupported platform"
 #endif

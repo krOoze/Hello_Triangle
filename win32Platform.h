@@ -6,6 +6,8 @@
 #include <Windows.h>
 #include <vulkan/vulkan.h>
 
+#include <sstream> 
+
 #include "CompilerMessages.h"
 
 
@@ -28,10 +30,10 @@ VkSurfaceKHR initSurface( VkInstance instance, VkPhysicalDevice physicalDevice, 
 
 // In case of non console subsystem just relay to main()
 int main();
-int CALLBACK WinMain( _In_ HINSTANCE hInstance, _In_ HINSTANCE hPrevInstance, _In_ LPSTR lpCmdLine, _In_ int nCmdShow ){
+int WINAPI wWinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine, int nCmdShow ){
 	UNREFERENCED_PARAMETER( hInstance );
 	UNREFERENCED_PARAMETER( hPrevInstance );
-	UNREFERENCED_PARAMETER( lpCmdLine );
+	UNREFERENCED_PARAMETER( pCmdLine );
 	UNREFERENCED_PARAMETER( nCmdShow );
 
 	return main();
@@ -93,7 +95,14 @@ PlatformWindow initWindow( int canvasWidth, int canvasHeight ){
 	TODO( "There should be only one wnd class made, but this will do for now -- could use overal generalization" )
 	static unsigned uniqueCounter = 0;
 	if( uniqueCounter == 1000 ) throw "What the is wrong with you... I mean: too many window class registrations made!";
-	std::wstring className =  L"vkwc" + std::to_wstring( uniqueCounter++ );
+
+	// HACK: MinGW doesn't support to_wstring()
+	std::wostringstream classNameSS;
+	classNameSS << L"vkwc";
+	classNameSS << uniqueCounter;
+	std::wstring className = classNameSS.str();
+	++uniqueCounter;
+
 	WNDCLASSEXW windowClass = {
 		sizeof( WNDCLASSEXW ), // cbSize
 		CS_OWNDC | CS_HREDRAW | CS_VREDRAW, // style - some window behavior

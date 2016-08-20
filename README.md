@@ -11,7 +11,7 @@ But I have tried not to cut corners making it. It contains proper error handling
 and I assume it is without errors :innocent:. It should perfectly adhere to the Vulkan spec
 e.g. it should do proper synchronization and do so in efficient way (as it was meant to be used).
 
- - TODO: check features and limits
+ - TODO: check limits
  - TODO: make vertex buffer in best memory + investigate device memory alignment
 
 Proper renderloop synchronization mini-tutorial
@@ -59,12 +59,10 @@ Requirements
 **Language**: C++14  
 **Environment**: installed LunarG SDK  
 **Environment**: preferably installed Vulkan capable drivers  
-**Environment**: MS Visual Studio or Cygwin  
+**Environment**: MS Visual Studio, Cygwin, MinGW (or IDEs running on top of them) 
 
-Adding VkSurface function for other OSes should be straightforward though.
+TODO: Adding VkSurface function for other OSes should be straightforward though.
 I would welcome if someone PR'd it (unless I do first :smile:).
-
-TODO: make sure it works in MinGW too.
 
 Files
 ----------------------------------
@@ -102,6 +100,10 @@ Build
 In Cygwin you can build it e.g. thusly (for x64):
 
     $ g++ -std=c++14 -Wall -m64 -mwindows -Wl,--subsystem,console -I$VULKAN_SDK/Include -oHelloTriangle HelloTriangle.cpp -L$WINDIR/System32 -lvulkan-1
+
+In MinGW like so:
+
+    $ g++ -std=gnu++14 -Wall -m32 -mwindows -Wl,--subsystem,console -I$VULKAN_SDK/Include -oHelloTriangle HelloTriangle.cpp -L$VULKAN_SDK/Bin32 -lvulkan-1
 
 In MS Visual Studio you can create Solution for it.
 You would add `$(VULKAN_SDK)\Include` to the the Additional Include Directories and
