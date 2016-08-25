@@ -1,0 +1,54 @@
+#version 450
+
+layout (local_size_x = 1, local_size_y = 1) in;
+
+layout (binding = 0) uniform writeonly image2D image;
+
+
+const uint scale = 10;
+
+const bool x = true;
+const bool o = false;
+
+const bool msg[][] = bool[][](
+	bool[](x,o,x, o, x,x,x, o, x,o,o, o, x,o,o, o, x,x,x),
+	bool[](x,o,x, o, x,o,o, o, x,o,o, o, x,o,o, o, x,o,x),
+	bool[](x,x,x, o, x,x,o, o, x,o,o, o, x,o,o, o, x,o,x),
+	bool[](x,o,x, o, x,o,o, o, x,o,o, o, x,o,o, o, x,o,x),
+	bool[](x,o,x, o, x,x,x, o, x,x,x, o, x,x,x, o, x,x,x)
+);
+
+
+
+
+const uvec2 msgSize = scale * uvec2( msg[0].length(), msg.length() );
+
+bool msgPixel( uvec2 pos ){
+	return msg[pos.y / scale][pos.x / scale];
+}
+
+bool globMsgPixel(){
+	uvec2 rectA = gl_NumWorkGroups.xy / 2 - msgSize / 2;
+	uvec2 rectB = rectA + msgSize;
+
+	if(
+		   gl_WorkGroupID.x < rectA.x
+		|| gl_WorkGroupID.y < rectA.y
+		|| gl_WorkGroupID.x >= rectB.x
+		|| gl_WorkGroupID.y >= rectB.y
+	){
+		return false;
+	}
+	else{
+		return msgPixel( gl_WorkGroupID.xy - rectA );
+	}
+
+}
+
+void main(){
+	const vec4 fontColor = vec4( 1.0, 1.0, 1.0, 1.0 );
+
+	if( globMsgPixel() ){
+		imageStore( image, ivec2(gl_WorkGroupID.xy), fontColor );
+	}
+}

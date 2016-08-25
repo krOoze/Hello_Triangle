@@ -136,7 +136,7 @@ PlatformWindow initWindow( int canvasWidth, int canvasHeight ){
 	HWND hWnd =  CreateWindowExW(
 		exStyle,
 		MAKEINTATOM(classAtom),
-		TEXT("Hello Vulkan Triangle"),
+		TEXT("Hello Vulkan Triangle 3: Resource Sharing"),
 		style,
 		CW_USEDEFAULT, CW_USEDEFAULT,
 		windowRect.right - windowRect.left, windowRect.bottom - windowRect.top,

@@ -2,7 +2,8 @@ Hello Triangle Vulkan demo
 =========================
 
 This is a traditional Hello World style application for graphical APIs (for Vulkan in this case).
-It renders a RGB shaded equilateral triangle.
+It renders a RGB shaded equilateral triangle and shows Resource Sharing and compute
+by painting "Hello" message on top.
 
 The code is quite flat and basic, so I think it's good enough for learning.
 No tutorial or even comments are provided though (comments do lie anyway :smirk:).
