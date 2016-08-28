@@ -422,7 +422,7 @@ int main() try{
 		endCommandBuffer( computeCommandBuffers[i] );
 	}
 
-
+	// NOTE: might not be needed (waiting on response from spec makers)
 	vector<VkCommandBuffer> transferBackCommandBuffers = acquireCommandBuffers( device, commandPool, imageCount );
 	for( size_t i = 0; i < computeCommandBuffers.size(); ++i ){
 		beginCommandBuffer( transferBackCommandBuffers[i] );
@@ -453,6 +453,7 @@ int main() try{
 		uint32_t nextSwapchainImageIndex = getNextImageIndex( device, swapchain, imageReadyS );
 		submitToQueue( queue, commandBuffers[nextSwapchainImageIndex], imageReadyS, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, renderDoneS );
 		submitToQueue( computeQueue, computeCommandBuffers[nextSwapchainImageIndex], renderDoneS, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, computeDoneS );
+		// NOTE: might not be needed (waiting on response from spec makers)
 		submitToQueue( queue, transferBackCommandBuffers[nextSwapchainImageIndex], computeDoneS, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, transferDoneS );
 		present( queue, swapchain, nextSwapchainImageIndex, transferDoneS );
 		++frames;
