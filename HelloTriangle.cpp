@@ -821,13 +821,8 @@ VkSwapchainKHR initSwapchain( VkPhysicalDevice physicalDevice, VkDevice device, 
 	}
 
 	// for all modes having at least two Images can be beneficial
-	uint32_t minImageCount = std::min<uint32_t>(
-		capabilities.maxImageCount,
-		std::max<uint32_t>(
-			2,
-			capabilities.minImageCount
-		)
-	);
+	uint32_t minImageCount = std::max<uint32_t>( 2, capabilities.minImageCount );
+	if( capabilities.maxImageCount ) minImageCount = std::min<uint32_t>( minImageCount, capabilities.maxImageCount );
 
 
 	VkSwapchainCreateInfoKHR swapchainInfo{
