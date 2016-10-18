@@ -4,10 +4,7 @@
 // Global header settings
 //////////////////////////
 
-#define _CRT_SECURE_NO_WARNINGS
-
-#include "LeanWindowsEnvironment.h"
-#include "VulkanEnvironment.h"
+#include "VulkanEnvironment.h" // first include must be before vulkan.h and platform header
 
 
 // Includes
@@ -22,7 +19,6 @@ using std::vector;
 
 #include <string>
 using std::string;
-using std::to_string;
 
 #include <exception>
 using std::exception;
@@ -47,38 +43,43 @@ using std::chrono::duration_cast;
 
 #include <algorithm>
 
-#include <vulkan/vulkan.h>
+#include <vulkan/vulkan.h> // assume core+WSI loaded
 
 #include "ErrorHandling.h"
 #include "Vertex.h"
 
 #ifdef VK_USE_PLATFORM_WIN32_KHR
 	#include "win32Platform.h"
+#else
+	#error "Unsupported platform (yet)"
 #endif
 
 // Config
 ///////////////////////
 
 // layers and debug
-TODO( "Should be also guarded by VK_EXT_debug_report" )
+TODO( "Should be also guarded by VK_EXT_debug_report in case of some exotic vulkan.h" )
 #ifdef _DEBUG
 constexpr bool debugVulkan = true;
 constexpr VkDebugReportFlagsEXT debugAmount =
-	/*VK_DEBUG_REPORT_INFORMATION_BIT_EXT |*/
-	VK_DEBUG_REPORT_WARNING_BIT_EXT |
-	VK_DEBUG_REPORT_PERFORMANCE_WARNING_BIT_EXT |
-	VK_DEBUG_REPORT_ERROR_BIT_EXT /*|
-	VK_DEBUG_REPORT_DEBUG_BIT_EXT*/;
+	0
+	//|  VK_DEBUG_REPORT_INFORMATION_BIT_EXT
+	| VK_DEBUG_REPORT_WARNING_BIT_EXT
+	| VK_DEBUG_REPORT_PERFORMANCE_WARNING_BIT_EXT
+	| VK_DEBUG_REPORT_ERROR_BIT_EXT
+	//| VK_DEBUG_REPORT_DEBUG_BIT_EXT
+;
 #else
 constexpr bool debugVulkan = false;
 constexpr VkDebugReportFlagsEXT debugAmount = 0;
 #endif
 
 // window and swapchain
-constexpr int windowWidth = 800;
-constexpr int windowHeight = 800;
+constexpr int initialWindowWidth = 800;
+constexpr int initialWindowHeight = 800;
 
-constexpr VkPresentModeKHR presentMode = VK_PRESENT_MODE_IMMEDIATE_KHR;
+//constexpr VkPresentModeKHR presentMode = VK_PRESENT_MODE_IMMEDIATE_KHR; // better not be used often because of coil whine
+constexpr VkPresentModeKHR presentMode = VK_PRESENT_MODE_FIFO_KHR;
 
 // pipeline settings
 constexpr VkClearValue clearColor = { {0.1f, 0.1f, 0.1f, 1.0f} };
@@ -144,7 +145,7 @@ void killSurface( VkInstance instance, VkSurfaceKHR surface );
 VkSurfaceCapabilitiesKHR getSurfaceCapabilities( VkPhysicalDevice physicalDevice, VkSurfaceKHR surface );
 VkSurfaceFormatKHR getSurfaceFormat( VkPhysicalDevice physicalDevice, VkSurfaceKHR surface );
 
-VkSwapchainKHR initSwapchain( VkPhysicalDevice physicalDevice, VkDevice device, VkSurfaceKHR surface, VkSurfaceFormatKHR surfaceFormat );
+VkSwapchainKHR initSwapchain( VkPhysicalDevice physicalDevice, VkDevice device, VkSurfaceKHR surface, VkSurfaceFormatKHR surfaceFormat, VkSurfaceCapabilitiesKHR capabilities, VkSwapchainKHR oldSwapchain = VK_NULL_HANDLE );
 void killSwapchain( VkDevice device, VkSwapchainKHR swapchain );
 
 vector<VkImage> getSwapchainImages( VkDevice device, VkSwapchainKHR swapchain );
@@ -193,7 +194,7 @@ void killSemaphore( VkDevice device, VkSemaphore semaphore );
 VkCommandPool initCommandPool( VkDevice device, const uint32_t queueFamily );
 void killCommandPool( VkDevice device, VkCommandPool commandPool );
 
-vector<VkCommandBuffer> acquireCommandBuffers( VkDevice device, VkCommandPool commandPool, uint32_t count );
+void acquireCommandBuffers( VkDevice device, VkCommandPool commandPool, uint32_t count, vector<VkCommandBuffer>& commandBuffers );
 void beginCommandBuffer( VkCommandBuffer commandBuffer );
 void endCommandBuffer( VkCommandBuffer commandBuffer );
 
@@ -259,20 +260,11 @@ int main() try{
 	);
 	VkQueue queue = getQueue( device, queueFamily, 0 );
 
-	PlatformWindow window = initWindow( ::windowWidth, ::windowHeight );
+	PlatformWindow window = initWindow( ::initialWindowWidth, ::initialWindowHeight );
 	VkSurfaceKHR surface = initSurface( instance, physicalDevice, queueFamily, window );
-	VkSurfaceCapabilitiesKHR surfaceCapabilities = getSurfaceCapabilities( physicalDevice, surface );
-	if( surfaceCapabilities.currentExtent.width != ::windowWidth || surfaceCapabilities.currentExtent.height != ::windowHeight ){
-		throw "Surface size does not match requested size!";
-	}
 	VkSurfaceFormatKHR surfaceFormat = getSurfaceFormat( physicalDevice, surface );
-	VkSwapchainKHR swapchain = initSwapchain( physicalDevice, device, surface, surfaceFormat );
-	vector<VkImage> swapchainImages = getSwapchainImages( device, swapchain );
-	vector<VkImageView> swapchainImageViews = initSwapchainImageViews( device, swapchainImages, surfaceFormat.format );
 
 	VkRenderPass renderPass = initRenderPass( device, surfaceFormat );
-
-	vector<VkFramebuffer> framebuffers = initFramebuffers( device, renderPass, swapchainImageViews, ::windowWidth, ::windowHeight );
 
 	VkShaderModule vertexShader = initShaderModule( device, ::vertexShaderFilename );
 	VkShaderModule fragmentShader = initShaderModule( device, ::fragmentShaderFilename );
@@ -300,44 +292,97 @@ int main() try{
 	VkSemaphore imageReadyS = initSemaphore( device );
 	VkSemaphore renderDoneS = initSemaphore( device );
 
-
 	VkCommandPool commandPool = initCommandPool( device, queueFamily );
-
-	vector<VkCommandBuffer> commandBuffers = acquireCommandBuffers(  device, commandPool, static_cast<uint32_t>( swapchainImages.size() )  );
-	for( size_t i = 0; i < commandBuffers.size(); ++i ){
-		beginCommandBuffer( commandBuffers[i] );
-			recordBeginRenderPass( commandBuffers[i], renderPass, framebuffers[i], ::clearColor, ::windowWidth, ::windowHeight );
-
-			recordBindPipeline( commandBuffers[i], pipeline );
-			recordBindVertexBuffer( commandBuffers[i], vertexBufferBinding, vertexBuffer );
-
-			recordSetViewport( commandBuffers[i], ::windowWidth, ::windowHeight );
-			recordSetScissor( commandBuffers[i], ::windowWidth, ::windowHeight );
-
-			recordDraw( commandBuffers[i], triangle );
-
-			recordEndRenderPass( commandBuffers[i] );
-		endCommandBuffer( commandBuffers[i] );
-	}
 
 	// might need synchronization if init is more advanced than this
 	//VkResult errorCode = vkDeviceWaitIdle( device ); RESULT_HANDLER( errorCode, "vkDeviceWaitIdle" );
+
+
+	// place-holder swapchain dependent objects
+	VkSwapchainKHR swapchain = VK_NULL_HANDLE;
+	vector<VkImageView> swapchainImageViews;
+	vector<VkFramebuffer> framebuffers;
+
+	vector<VkCommandBuffer> commandBuffers;
+
+	auto recreateSwapchain = [&](){
+		// swapchain recreation -- will be done before the first frame too;
+		TODO( "Should substract all of this from the timer. But it is not serious measurement anyway..." )
+
+		VkResult errorCode = vkDeviceWaitIdle( device ); RESULT_HANDLER( errorCode, "vkDeviceWaitIdle" );
+
+		// cleanup -- BTW Vulkan is OK destroying NULL objects too
+		errorCode = vkResetCommandPool( device, commandPool, 0 ); RESULT_HANDLER( errorCode, "vkResetCommandPool" );
+
+		killFramebuffers( device, framebuffers );
+		killSwapchainImageViews( device, swapchainImageViews );
+
+		// recreation
+		VkSurfaceCapabilitiesKHR capabilities = getSurfaceCapabilities( physicalDevice, surface );
+		VkExtent2D surfaceSize = {
+			capabilities.currentExtent.width == UINT32_MAX ? ::initialWindowWidth : capabilities.currentExtent.width,
+			capabilities.currentExtent.height == UINT32_MAX ? ::initialWindowHeight : capabilities.currentExtent.height,
+		};
+
+
+		swapchain = initSwapchain( physicalDevice, device, surface, surfaceFormat, capabilities, swapchain );
+		vector<VkImage> swapchainImages = getSwapchainImages( device, swapchain );
+		swapchainImageViews = initSwapchainImageViews( device, swapchainImages, surfaceFormat.format );
+		framebuffers = initFramebuffers( device, renderPass, swapchainImageViews, surfaceSize.width, surfaceSize.height );
+
+		acquireCommandBuffers(  device, commandPool, static_cast<uint32_t>( swapchainImages.size() ), commandBuffers  );
+		for( size_t i = 0; i < swapchainImages.size(); ++i ){
+			beginCommandBuffer( commandBuffers[i] );
+				recordBeginRenderPass( commandBuffers[i], renderPass, framebuffers[i], ::clearColor, surfaceSize.width, surfaceSize.height );
+
+				recordBindPipeline( commandBuffers[i], pipeline );
+				recordBindVertexBuffer( commandBuffers[i], vertexBufferBinding, vertexBuffer );
+
+				recordSetViewport( commandBuffers[i], surfaceSize.width, surfaceSize.height );
+				recordSetScissor( commandBuffers[i], surfaceSize.width, surfaceSize.height );
+
+				recordDraw( commandBuffers[i], triangle );
+
+				recordEndRenderPass( commandBuffers[i] );
+			endCommandBuffer( commandBuffers[i] );
+		}
+	};
 
 	// lets have simple non-robust performance info for fun
 	unsigned frames = 0;
 	steady_clock::time_point start = steady_clock::now();
 
-	int ret = EXIT_SUCCESS;
-	for( bool quit = false; !quit; ){
-		ret = messageLoop( quit ); // process all available events
+	// Finally, rendering! Yay!
+	std::function<void(void)> render = [&](){
+		try{
+			uint32_t nextSwapchainImageIndex = getNextImageIndex( device, swapchain, imageReadyS );
 
-		// Rendering! Yay!
-		uint32_t nextSwapchainImageIndex = getNextImageIndex( device, swapchain, imageReadyS );
-		submitToQueue( queue, commandBuffers[nextSwapchainImageIndex], imageReadyS, renderDoneS );
-		present( queue, swapchain, nextSwapchainImageIndex, renderDoneS );
-		++frames;
-	}
+			submitToQueue( queue, commandBuffers[nextSwapchainImageIndex], imageReadyS, renderDoneS );
+			present( queue, swapchain, nextSwapchainImageIndex, renderDoneS );
+			++frames;
+		}
+		catch( VulkanResultException ex ){
+			if( ex.result == VK_SUBOPTIMAL_KHR || ex.result == VK_ERROR_OUT_OF_DATE_KHR ){
+				recreateSwapchain();
 
+				// we need to start over...
+				render();
+			}
+			else throw;
+		}
+	};
+
+
+	setSizeEventHandler( recreateSwapchain );
+	setPaintEventHandler( render );
+
+
+	// Finally start the main message loop (and so render too)
+	showWindow( window );
+	int ret = messageLoop();
+
+
+	// proper Vulkan cleanup
 	VkResult errorCode = vkDeviceWaitIdle( device ); RESULT_HANDLER( errorCode, "vkDeviceWaitIdle" );
 
 	steady_clock::time_point end = steady_clock::now();
@@ -808,9 +853,7 @@ VkPresentModeKHR getSurfacePresentMode( VkPhysicalDevice physicalDevice, VkSurfa
 	throw "Your prefered present mode is not supported! Adjust your config or try FIFO (always supported).";
 }
 
-VkSwapchainKHR initSwapchain( VkPhysicalDevice physicalDevice, VkDevice device, VkSurfaceKHR surface, VkSurfaceFormatKHR surfaceFormat ){
-	VkSurfaceCapabilitiesKHR capabilities = getSurfaceCapabilities( physicalDevice, surface );
-
+VkSwapchainKHR initSwapchain( VkPhysicalDevice physicalDevice, VkDevice device, VkSurfaceKHR surface, VkSurfaceFormatKHR surfaceFormat, VkSurfaceCapabilitiesKHR capabilities, VkSwapchainKHR oldSwapchain ){
 	if(  !( capabilities.supportedUsageFlags & VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT )  ){
 		throw "VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT not supported!";
 	}
@@ -843,16 +886,19 @@ VkSwapchainKHR initSwapchain( VkPhysicalDevice physicalDevice, VkDevice device, 
 		VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
 		getSurfacePresentMode( physicalDevice, surface ),
 		VK_TRUE, // clipped
-		VK_NULL_HANDLE
+		oldSwapchain
 	};
 
 	VkSwapchainKHR swapchain;
 	VkResult errorCode = vkCreateSwapchainKHR( device, &swapchainInfo, nullptr, &swapchain ); RESULT_HANDLER( errorCode, "vkCreateSwapchainKHR" );
 
+	killSwapchain( device, oldSwapchain );
+
 	return swapchain;
 }
 
 void killSwapchain( VkDevice device, VkSwapchainKHR swapchain ){
+	if( swapchain == VK_NULL_HANDLE ) return; TODO( "This is a workaround for bad drivers" )
 	vkDestroySwapchainKHR( device, swapchain, nullptr );
 }
 
@@ -901,6 +947,7 @@ vector<VkImageView> initSwapchainImageViews( VkDevice device, vector<VkImage> im
 
 void killSwapchainImageViews( VkDevice device, vector<VkImageView> imageViews ){
 	for( auto imageView : imageViews ) vkDestroyImageView( device, imageView, nullptr );
+	imageViews.clear();
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1011,6 +1058,7 @@ vector<VkFramebuffer> initFramebuffers(
 
 void killFramebuffers( VkDevice device, vector<VkFramebuffer> framebuffers ){
 	for( auto framebuffer : framebuffers ) vkDestroyFramebuffer( device, framebuffer, nullptr );
+	framebuffers.clear();
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1074,7 +1122,7 @@ VkPipeline initPipeline(
 	VkShaderModule vertexShader,
 	VkShaderModule fragmentShader,
 	const uint32_t vertexBufferBinding
-){
+){/*
 	const VkPipelineShaderStageCreateInfo vertexShaderStage{
 		VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
 		nullptr, // pNext
@@ -1093,9 +1141,28 @@ VkPipeline initPipeline(
 		fragmentShader,
 		u8"main",
 		nullptr // SpecializationInfo - constants pushed to shader on pipeline creation time
-	};
+	};*/
 
-	vector<VkPipelineShaderStageCreateInfo> shaderStageStates = { vertexShaderStage, fragmentShaderStage };
+	VkPipelineShaderStageCreateInfo shaderStageStates[] = { 
+		{
+			VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+			nullptr, // pNext
+			0, // flags - reserved for future use
+			VK_SHADER_STAGE_VERTEX_BIT,
+			vertexShader,
+			u8"main",
+			nullptr // SpecializationInfo - constants pushed to shader on pipeline creation time
+		}, 
+		{
+			VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+			nullptr, // pNext
+			0, // flags - reserved for future use
+			VK_SHADER_STAGE_FRAGMENT_BIT,
+			fragmentShader,
+			u8"main",
+			nullptr // SpecializationInfo - constants pushed to shader on pipeline creation time
+		}
+	};
 
 	const uint32_t vertexBufferStride = sizeof( Vertex2D_ColorF_pack );
 	if( vertexBufferBinding > limits.maxVertexInputBindings ){
@@ -1241,8 +1308,8 @@ VkPipeline initPipeline(
 		VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
 		nullptr, // pNext
 		0, // flags - e.g. disable optimization
-		static_cast<uint32_t>( shaderStageStates.size() ), // shader stages count - vertex and fragment
-		shaderStageStates.data(),
+		2, // shader stages count - vertex and fragment
+		shaderStageStates,
 		&vertexInputState,
 		&inputAssemblyState,
 		nullptr, // tesselation
@@ -1315,18 +1382,21 @@ void killCommandPool( VkDevice device, VkCommandPool commandPool ){
 	vkDestroyCommandPool( device, commandPool, nullptr );
 }
 
-vector<VkCommandBuffer> acquireCommandBuffers( VkDevice device, VkCommandPool commandPool, uint32_t count ){
-	VkCommandBufferAllocateInfo commandBufferInfo{
-		VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
-		nullptr, // pNext
-		commandPool,
-		VK_COMMAND_BUFFER_LEVEL_PRIMARY,
-		count // count
-	};
+void acquireCommandBuffers( VkDevice device, VkCommandPool commandPool, uint32_t count, vector<VkCommandBuffer>& commandBuffers ){
+	auto oldSize = commandBuffers.size();
 
-	vector<VkCommandBuffer> commandBuffers( count );
-	VkResult errorCode = vkAllocateCommandBuffers( device, &commandBufferInfo, commandBuffers.data() ); RESULT_HANDLER( errorCode, "vkAllocateCommandBuffers" );
-	return commandBuffers;
+	if( count > oldSize ){
+		VkCommandBufferAllocateInfo commandBufferInfo{
+			VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
+			nullptr, // pNext
+			commandPool,
+			VK_COMMAND_BUFFER_LEVEL_PRIMARY,
+			count - static_cast<uint32_t>( oldSize ) // count
+		};
+
+		commandBuffers.resize( count );
+		VkResult errorCode = vkAllocateCommandBuffers( device, &commandBufferInfo, &commandBuffers[oldSize] ); RESULT_HANDLER( errorCode, "vkAllocateCommandBuffers" );
+	}
 }
 
 void beginCommandBuffer( VkCommandBuffer commandBuffer ){
@@ -1434,9 +1504,10 @@ void present( VkQueue queue, VkSwapchainKHR swapchain, uint32_t swapchainImageIn
 		1, // swapchain count
 		&swapchain,
 		&swapchainImageIndex,
-		nullptr//&errorCodeSwapchain
+		nullptr //&errorCodeSwapchain
 	};
 
 	VkResult errorCode = vkQueuePresentKHR( queue, &presentInfo ); RESULT_HANDLER( errorCode, "vkQueuePresentKHR" );
+
 	//RESULT_HANDLER( errorCodeSwapchain, "vkQueuePresentKHR" );
 }

@@ -3,6 +3,8 @@
 #ifndef COMMON_ERROR_HANDLING_H
 #define COMMON_ERROR_HANDLING_H
 
+#include <sstream>
+
 #include <vulkan/vulkan.h>
 
 #include "CompilerMessages.h"
@@ -21,8 +23,12 @@ struct VulkanResultException{
 #define RESULT_HANDLER( errorCode, source )  if( errorCode ) throw VulkanResultException( __FILE__, __LINE__, __func__, source, errorCode )
 #define RESULT_HANDLER_EX( cond, errorCode, source )  if( cond ) throw VulkanResultException( __FILE__, __LINE__, __func__, source, errorCode )
 
-const char* to_string( VkResult r );
-const char* to_string( VkDebugReportObjectTypeEXT o );
+TODO( "These are workaround functions for the broken MinGW" );
+template<typename T>
+string to_string_via_ss( T i );
+
+template<typename T>
+string to_string( T i );
 
 VKAPI_ATTR VkBool32 VKAPI_CALL genericDebugCallback(
 	VkFlags msgFlags,
@@ -45,6 +51,16 @@ void killDebug( VkInstance instance, VkDebugReportCallbackEXT debug );
 
 // Implementation
 //////////////////////////////////
+
+template<typename T>
+string to_string_via_ss( T i ){
+	std::ostringstream ss;
+	ss << i;
+	return ss.str();
+}
+
+template<typename T>
+string to_string( T i ){ return to_string_via_ss( i ); }
 
 const char* to_string( VkResult r ){
 	switch( r ){
