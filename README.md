@@ -18,6 +18,19 @@ goal (to have at least for this elementary case a flawless application).
  - TODO: check limits
  - TODO: make vertex buffer in best memory + investigate device memory alignment
 
+Branches
+-----------------
+The git branches demonstrate some elementary Vulkan techniques which can be
+easily grafted on this basic example (it is nice to see a diff of what needs
+to be changed for it to work). Their `README.md` should be edited to reflect
+the changes.
+
+| branch | description |
+|---|---|
+| `MSAA` | Antialiasing (i.e. Vulkan's multisample image resolve) |
+| `queue_transfer` | Transfer of `EXCLUSIVE` image between queue families (separate graphics and present queue family) |
+| `vertex_offset` | Demonstrates how offset in `vkCmdBindVertexBuffers()` works |
+
 Proper renderloop synchronization mini-tutorial
 -------------------------------------
 
