@@ -9,8 +9,8 @@ Let's cover it in sort of an execution order:
 
 2. You provide `imageAcquired` semaphore to the command buffer submit to be waited on.
 As a `pWaitDstStageMask` you provide the stage of your first write to the swapchain
-VkImage. Most often it will be `VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT`
-(but could be different e.g. if you do MSAA or copy to the frame VkImage).
+`VkImage`. Most often it will be `VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT`
+(but could be different based on your subpass implementation).
 
 3. In the command buffer you change the layout of the swapchain image 
 (Pipeline Barriers, Events or Subpasses do that) **from** the present one ( use 
