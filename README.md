@@ -48,6 +48,8 @@ Requirements
 **Environment**: MS Visual Studio, Cygwin, MinGW (or IDEs running on top of
 them)
 
+There is an untested Linux compatibility via XLib.
+
 TODO: Adding VkSurface function for other OSes should be straightforward though.
 I would welcome if someone PR'd it (unless I do first :smile:).
 
@@ -101,6 +103,10 @@ You would add `$(VULKAN_SDK)\Include` to the the Additional Include Directories
 and `$(VULKAN_SDK)\Bin\vulkan-1.lib` (or `Bin32` for x86) to the Additional
 Dependencies property. You may choose between `windows` or `console` subsystem
 in SubSystem property.
+
+In Linux distro you would do e.g.:
+
+    $ g++ --std=c++14 -Wall -m64 -D_DEBUG -I$VULKAN_SDK/include -oHelloTriangle HelloTriangle.cpp -L$VULKAN_SDK/lib -lX11 -lvulkan
 
 Run
 ------------------------

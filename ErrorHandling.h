@@ -4,6 +4,7 @@
 #define COMMON_ERROR_HANDLING_H
 
 #include <sstream>
+#include <iostream>
 
 #include <vulkan/vulkan.h>
 
@@ -137,6 +138,8 @@ VKAPI_ATTR VkBool32 VKAPI_CALL genericDebugCallback(
 	const char* pMsg,
 	void* /*pUserData*/
 ){
+	using std::cout;
+	using std::endl;
 
 	string report = to_string( objType ) + to_string( srcObject ) + ": " + to_string( msgCode ) + ", " + pLayerPrefix + ", " + pMsg;;
 

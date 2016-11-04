@@ -8,13 +8,13 @@
 #define STRINGIZE_HELPER(x) #x
 #define STRINGIZE(x) STRINGIZE_HELPER(x)
 
-#ifdef _MSC_VER
+#if defined(_MSC_VER)
 	#define TODO(desc) __pragma( message(__FILE__ "(" STRINGIZE(__LINE__) ")" ": warning TODO:"  desc) )
-#elif __GNUG__
+#elif defined(__GNUG__)
 	#define DO_PRAGMA(x) _Pragma (#x)
 	#define TODO(desc) DO_PRAGMA(message "TODO: " desc)
 #else
-	#define TODO(desc) 
+	#define TODO(desc)
 #endif
 
 // usage:

@@ -10,22 +10,27 @@
 	#error Some vulkan.h is already included before this file!
 #endif //VULKAN_H_
 
+#include "CompilerMessages.h"
+
 // platform specific settings
-#ifdef _WIN32
+TODO( "Apparently XCB can exist in windows compiler, so shouldn't be choosing automatically." )
+
+#if defined(_WIN32)
 	#define VK_USE_PLATFORM_WIN32_KHR
 	#define _CRT_SECURE_NO_WARNINGS
 	#include "LeanWindowsEnvironment.h" // Windows.h settings must be first -- vulkan.h does include Windows.h
-#elif __CYGWIN__
+#elif defined(__CYGWIN__)
 	#define VK_USE_PLATFORM_WIN32_KHR
 	#include "LeanWindowsEnvironment.h" // Windows.h settings must be first -- vulkan.h does include Windows.h
-#elif  __MINGW32__
+#elif defined(__MINGW32__)
 	#define VK_USE_PLATFORM_WIN32_KHR
 	#include "LeanWindowsEnvironment.h" // Windows.h settings must be first -- vulkan.h does include Windows.h
+#elif defined(__linux__)
+	#define VK_USE_PLATFORM_XLIB_KHR
 #else
 	#error "Unsupported platform"
 #endif
 
-#include "CompilerMessages.h"
 TODO( "Add other (all would be awesome) platforms" )
 
 #endif //COMMON_VULKAN_ENVIRONMENT_H

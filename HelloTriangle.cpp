@@ -48,8 +48,12 @@ using std::chrono::duration_cast;
 #include "ErrorHandling.h"
 #include "Vertex.h"
 
-#ifdef VK_USE_PLATFORM_WIN32_KHR
+#if defined(VK_USE_PLATFORM_WIN32_KHR)
 	#include "win32Platform.h"
+#elif defined(VK_USE_PLATFORM_XLIB_KHR)
+	#include "xlibPlatform.h"
+#elif defined(VK_USE_PLATFORM_XCB_KHR)
+	#include "xcbPlatform.h"
 #else
 	#error "Unsupported platform (yet)"
 #endif
@@ -97,7 +101,9 @@ VkPhysicalDevice getPhysicalDevice( VkInstance instance ); // destroyed with ins
 VkPhysicalDeviceProperties getPhysicalDeviceProperties( VkPhysicalDevice physicalDevice );
 VkPhysicalDeviceMemoryProperties getPhysicalDeviceMemoryProperties( VkPhysicalDevice physicalDevice );
 
-uint32_t getQueueFamily( VkPhysicalDevice physDevice );
+bool getPresentationSupport( VkPhysicalDevice physDevice, uint32_t queueFamily, VkSurfaceKHR surface );
+
+uint32_t getQueueFamily( VkPhysicalDevice physDevice, VkSurfaceKHR surface );
 
 VkDevice initDevice(
 	VkPhysicalDevice physDevice,
@@ -236,7 +242,7 @@ int main() try{
 	vector<const char*> layers;
 	if( ::debugVulkan ) layers.push_back( "VK_LAYER_LUNARG_standard_validation" );
 
-	vector<const char*> instanceExtensions = {VK_KHR_SURFACE_EXTENSION_NAME, PLATFORM_SURFACE_EXTENSION_NAME};
+	vector<const char*> instanceExtensions = { VK_KHR_SURFACE_EXTENSION_NAME, PLATFORM_SURFACE_EXTENSION_NAME };
 	if( ::debugVulkan ) instanceExtensions.push_back( VK_EXT_DEBUG_REPORT_EXTENSION_NAME );
 
 	VkInstance instance = initInstance(
@@ -246,11 +252,14 @@ int main() try{
 
 	VkDebugReportCallbackEXT debug = ::debugVulkan ? initDebug( instance, ::debugAmount ) : VK_NULL_HANDLE;
 
+	PlatformWindow window = initWindow( ::initialWindowWidth, ::initialWindowHeight );
+	VkSurfaceKHR surface = initSurface( instance, window );
+
 	VkPhysicalDevice physicalDevice = getPhysicalDevice( instance );
 	VkPhysicalDeviceFeatures features = {}; // don't need anything for this demo
 	VkPhysicalDeviceProperties physicalDeviceProperties = getPhysicalDeviceProperties( physicalDevice );
 	VkPhysicalDeviceMemoryProperties physicalDeviceMemoryProperties = getPhysicalDeviceMemoryProperties( physicalDevice );
-	uint32_t queueFamily = getQueueFamily( physicalDevice );
+	uint32_t queueFamily = getQueueFamily( physicalDevice, surface );
 	VkDevice device = initDevice(
 		physicalDevice,
 		features,
@@ -260,8 +269,6 @@ int main() try{
 	);
 	VkQueue queue = getQueue( device, queueFamily, 0 );
 
-	PlatformWindow window = initWindow( ::initialWindowWidth, ::initialWindowHeight );
-	VkSurfaceKHR surface = initSurface( instance, physicalDevice, queueFamily, window );
 	VkSurfaceFormatKHR surfaceFormat = getSurfaceFormat( physicalDevice, surface );
 
 	VkRenderPass renderPass = initRenderPass( device, surfaceFormat );
@@ -289,9 +296,6 @@ int main() try{
 	);
 	setVertexData( device, vertexBufferMemory, triangle );
 
-	VkSemaphore imageReadyS = initSemaphore( device );
-	VkSemaphore renderDoneS = initSemaphore( device );
-
 	VkCommandPool commandPool = initCommandPool( device, queueFamily );
 
 	// might need synchronization if init is more advanced than this
@@ -305,6 +309,10 @@ int main() try{
 
 	vector<VkCommandBuffer> commandBuffers;
 
+	VkSemaphore imageReadyS = VK_NULL_HANDLE;
+	VkSemaphore renderDoneS = VK_NULL_HANDLE;
+
+
 	auto recreateSwapchain = [&](){
 		// swapchain recreation -- will be done before the first frame too;
 		TODO( "Should substract all of this from the timer. But it is not serious measurement anyway..." )
@@ -314,8 +322,11 @@ int main() try{
 		// cleanup -- BTW Vulkan is OK destroying NULL objects too
 		errorCode = vkResetCommandPool( device, commandPool, 0 ); RESULT_HANDLER( errorCode, "vkResetCommandPool" );
 
+		killSemaphore( device, imageReadyS );
+		killSemaphore( device, renderDoneS );
 		killFramebuffers( device, framebuffers );
 		killSwapchainImageViews( device, swapchainImageViews );
+		killSwapchain( device, swapchain ); swapchain = VK_NULL_HANDLE; 
 
 		// recreation
 		VkSurfaceCapabilitiesKHR capabilities = getSurfaceCapabilities( physicalDevice, surface );
@@ -324,8 +335,9 @@ int main() try{
 			capabilities.currentExtent.height == UINT32_MAX ? ::initialWindowHeight : capabilities.currentExtent.height,
 		};
 
+		TODO( "Could use oldSwapchain, but not sure how without leaking it (my driver crashes if I destroy it)." )
+		swapchain = initSwapchain( physicalDevice, device, surface, surfaceFormat, capabilities, VK_NULL_HANDLE );
 
-		swapchain = initSwapchain( physicalDevice, device, surface, surfaceFormat, capabilities, swapchain );
 		vector<VkImage> swapchainImages = getSwapchainImages( device, swapchain );
 		swapchainImageViews = initSwapchainImageViews( device, swapchainImages, surfaceFormat.format );
 		framebuffers = initFramebuffers( device, renderPass, swapchainImageViews, surfaceSize.width, surfaceSize.height );
@@ -346,6 +358,9 @@ int main() try{
 				recordEndRenderPass( commandBuffers[i] );
 			endCommandBuffer( commandBuffers[i] );
 		}
+
+		imageReadyS = initSemaphore( device );
+		renderDoneS = initSemaphore( device );
 	};
 
 	// lets have simple non-robust performance info for fun
@@ -379,7 +394,7 @@ int main() try{
 
 	// Finally start the main message loop (and so render too)
 	showWindow( window );
-	int ret = messageLoop();
+	int ret = messageLoop( window );
 
 
 	// proper Vulkan cleanup
@@ -389,11 +404,17 @@ int main() try{
 	duration<double> time_span = duration_cast<duration<double>>( end - start );
 	cout << "Rendered " << frames << " frames in " << time_span.count() << " seconds. Average FPS is " << frames / time_span.count() << endl;
 
-
-	killCommandPool( device,  commandPool );
-
+	// kill swapchain
 	killSemaphore( device, imageReadyS );
 	killSemaphore( device, renderDoneS );
+
+	killFramebuffers( device, framebuffers );
+
+	killSwapchainImageViews( device, swapchainImageViews );
+	killSwapchain( device, swapchain );
+
+	// kill vulkan
+	killCommandPool( device,  commandPool );
 
 	killMemory( device, vertexBufferMemory );
 	killBuffer( device, vertexBuffer );
@@ -403,16 +424,12 @@ int main() try{
 	killShaderModule( device, fragmentShader );
 	killShaderModule( device, vertexShader );
 
-	killFramebuffers( device, framebuffers );
-
 	killRenderPass( device, renderPass );
 
-	killSwapchainImageViews( device, swapchainImageViews );
-	killSwapchain( device, swapchain );
+	killDevice( device );
+
 	killSurface( instance, surface );
 	killWindow( window );
-
-	killDevice( device );
 
 	if( ::debugVulkan ) killDebug( instance, debug );
 	killInstance( instance );
@@ -545,14 +562,22 @@ vector<VkQueueFamilyProperties> getQueueFamilyProperties( VkPhysicalDevice devic
 	return queueFamilies;
 }
 
-uint32_t getQueueFamily( VkPhysicalDevice physDevice ){
+bool getPresentationSupport( VkPhysicalDevice physDevice, uint32_t queueFamily, VkSurfaceKHR surface ){
+	VkBool32 supported;
+	VkResult errorCode = vkGetPhysicalDeviceSurfaceSupportKHR( physDevice, queueFamily, surface, &supported ); RESULT_HANDLER( errorCode, "vkGetPhysicalDeviceSurfaceSupportKHR" );
+
+	return supported == VK_TRUE;
+}
+
+uint32_t getQueueFamily( VkPhysicalDevice physDevice, VkSurfaceKHR surface ){
 	auto qfps = getQueueFamilyProperties( physDevice );
 	uint32_t qfi = 0;
 
+	TODO( "Should contain possibility of separate graphics and present queues?" )
+
 	for( ; qfi < qfps.size(); ++qfi ){
 		if( qfps[qfi].queueFlags & VK_QUEUE_GRAPHICS_BIT ){
-			TODO( "Might need some platform dependent stuff passed" )
-			if(  presentationSupport( physDevice, qfi )  ){
+			if(  getPresentationSupport( physDevice, qfi, surface )  ){
 				return qfi;
 			}
 		}
@@ -1362,6 +1387,7 @@ VkSemaphore initSemaphore( VkDevice device ){
 }
 
 void killSemaphore( VkDevice device, VkSemaphore semaphore ){
+	if( semaphore == VK_NULL_HANDLE ) return; TODO( "This is a workaround for bad drivers" )
 	vkDestroySemaphore( device, semaphore, nullptr );
 }
 

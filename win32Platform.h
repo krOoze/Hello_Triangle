@@ -13,17 +13,16 @@
 
 TODO( "Easier to use, but might prevent platform co-existence. Could be namespaced. Make all of this a class?" )
 #define PLATFORM_SURFACE_EXTENSION_NAME VK_KHR_WIN32_SURFACE_EXTENSION_NAME
-struct PlatformWindow{ HINSTANCE hInstance; ATOM wndClass; HWND hWnd; };
+struct PlatformWindow{ HINSTANCE hInstance; HWND hWnd; };
 
-int messageLoop( bool& quit );
-LRESULT CALLBACK wndProc( HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam );
+int messageLoop( PlatformWindow window );
 
-bool presentationSupport( VkPhysicalDevice device, uint32_t queueFamilyIndex );
+bool platformPresentationSupport( VkPhysicalDevice device, uint32_t queueFamilyIndex, PlatformWindow window );
 
 PlatformWindow initWindow( int canvasWidth, int canvasHeight );
 void killWindow( PlatformWindow window );
 
-VkSurfaceKHR initSurface( VkInstance instance, VkPhysicalDevice physicalDevice, uint32_t queueFamily, PlatformWindow window );
+VkSurfaceKHR initSurface( VkInstance instance, PlatformWindow window );
 // killSurface() is not platform dependent
 
 void setSizeEventHandler( std::function<void(void)> newSizeEventHandler );
@@ -66,7 +65,11 @@ void showWindow( PlatformWindow window ){
 	SetForegroundWindow( window.hWnd );
 }
 
-int messageLoop(){
+int messageLoop( PlatformWindow window ){
+	UNREFERENCED_PARAMETER( window );
+
+	TODO( "Could perhaps use PeekMessage, validate the image when painted and invalidate it when no messages. And provide background brush. Should behave better." )
+
 	MSG msg;
 	BOOL ret = GetMessageW( &msg, NULL, 0, 0 );
 
@@ -122,7 +125,7 @@ LRESULT CALLBACK wndProc( HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam ){
 }
 
 
-bool presentationSupport( VkPhysicalDevice device, uint32_t queueFamilyIndex ){
+bool platformPresentationSupport( VkPhysicalDevice device, uint32_t queueFamilyIndex, PlatformWindow ){
 	return vkGetPhysicalDeviceWin32PresentationSupportKHR( device, queueFamilyIndex ) == VK_TRUE;
 }
 
@@ -189,7 +192,7 @@ PlatformWindow initWindow( int canvasWidth, int canvasHeight ){
 		throw string( "Trouble creating window instance: " ) + to_string( GetLastError() );
 	}
 
-	return { hInstance, classAtom, hWnd };
+	return { hInstance, hWnd };
 }
 
 void killWindow( PlatformWindow window ){
@@ -197,13 +200,13 @@ void killWindow( PlatformWindow window ){
 
 	--classAtomRefCount;
 	if( classAtomRefCount == 0 ){
-		if(  !UnregisterClassW( MAKEINTATOM(window.wndClass), window.hInstance )  ){
+		if(  !UnregisterClassW( MAKEINTATOM(classAtom), window.hInstance )  ){
 			throw string( "Trouble unregistering window class: " ) + to_string( GetLastError() );
 		}
 	}
 }
 
-VkSurfaceKHR initSurface( VkInstance instance, VkPhysicalDevice physicalDevice, uint32_t queueFamily, PlatformWindow window ){
+VkSurfaceKHR initSurface( VkInstance instance, PlatformWindow window ){
 	VkWin32SurfaceCreateInfoKHR surfaceInfo{
 		VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR,
 		nullptr, // pNext for extensions use
@@ -215,11 +218,6 @@ VkSurfaceKHR initSurface( VkInstance instance, VkPhysicalDevice physicalDevice, 
 
 	VkSurfaceKHR surface;
 	VkResult errorCode = vkCreateWin32SurfaceKHR( instance, &surfaceInfo, nullptr, &surface ); RESULT_HANDLER( errorCode, "vkCreateWin32SurfaceKHR" );
-
-	// validate WSI support
-	VkBool32 supported;
-	errorCode = vkGetPhysicalDeviceSurfaceSupportKHR( physicalDevice, queueFamily, surface, &supported ); RESULT_HANDLER( errorCode, "vkGetPhysicalDeviceSurfaceSupportKHR" );
-	if( !supported ) throw "Selected queue family of physical device can't present to the surface!";
 
 	return surface;
 }
