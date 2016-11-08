@@ -94,6 +94,8 @@ PlatformWindow initWindow( int canvasWidth, int canvasHeight ){
 		&values
 	); 
 
+	Atom WM_DELETE_WINDOW = XInternAtom( display, "WM_DELETE_WINDOW", False );
+	XSetWMProtocols( display, window, &WM_DELETE_WINDOW, 1);
 
 	XFlush( display );
 	return { display, window, visual_id };
@@ -168,9 +170,9 @@ int messageLoop( PlatformWindow window ){
 				if( ce.width != width || ce.height != height ){
 					sizeEventHandler();
 				}
+
 				break;
 			}
-
 
 			case KeyPress:{
 				XKeyPressedEvent kpe = e.xkey;
@@ -181,6 +183,18 @@ int messageLoop( PlatformWindow window ){
 					case XK_Escape:
 						quit = true;
 				}
+
+				break;
+			}
+
+			case ClientMessage:{
+				XClientMessageEvent cme = e.xclient;
+
+				Atom WM_DELETE_WINDOW = XInternAtom( window.display, "WM_DELETE_WINDOW", True );
+				if( (Atom)Event.xclient.data.l[0] == WM_DELETE_WINDOW ){
+					quit = true;
+				}
+
 				break;
 			}
 
