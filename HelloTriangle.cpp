@@ -923,7 +923,8 @@ VkSwapchainKHR initSwapchain( VkPhysicalDevice physicalDevice, VkDevice device, 
 }
 
 void killSwapchain( VkDevice device, VkSwapchainKHR swapchain ){
-	if( swapchain == VK_NULL_HANDLE ) return; TODO( "This is a workaround for bad drivers" )
+	TODO( "This is a workaround for bad drivers" )
+	if( swapchain == VK_NULL_HANDLE ) return;
 	vkDestroySwapchainKHR( device, swapchain, nullptr );
 }
 
@@ -1387,7 +1388,8 @@ VkSemaphore initSemaphore( VkDevice device ){
 }
 
 void killSemaphore( VkDevice device, VkSemaphore semaphore ){
-	if( semaphore == VK_NULL_HANDLE ) return; TODO( "This is a workaround for bad drivers" )
+	TODO( "This is a workaround for bad drivers" )
+	if( semaphore == VK_NULL_HANDLE ) return;
 	vkDestroySemaphore( device, semaphore, nullptr );
 }
 

@@ -191,7 +191,7 @@ int messageLoop( PlatformWindow window ){
 				XClientMessageEvent cme = e.xclient;
 
 				Atom WM_DELETE_WINDOW = XInternAtom( window.display, "WM_DELETE_WINDOW", True );
-				if( (Atom)Event.xclient.data.l[0] == WM_DELETE_WINDOW ){
+				if( (Atom)cme.data.l[0] == WM_DELETE_WINDOW ){
 					quit = true;
 				}
 
