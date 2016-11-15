@@ -335,8 +335,7 @@ int main() try{
 			capabilities.currentExtent.height == UINT32_MAX ? ::initialWindowHeight : capabilities.currentExtent.height,
 		};
 
-		TODO( "Could use oldSwapchain, but not sure how without leaking it (my driver crashes if I destroy it)." )
-		swapchain = initSwapchain( physicalDevice, device, surface, surfaceFormat, capabilities, VK_NULL_HANDLE );
+		swapchain = initSwapchain( physicalDevice, device, surface, surfaceFormat, capabilities, swapchain );
 
 		vector<VkImage> swapchainImages = getSwapchainImages( device, swapchain );
 		swapchainImageViews = initSwapchainImageViews( device, swapchainImages, surfaceFormat.format );
