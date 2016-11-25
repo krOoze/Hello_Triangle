@@ -28,7 +28,7 @@ the changes.
 | branch | description |
 |---|---|
 | `MSAA` | Antialiasing (i.e. Vulkan's multisample image resolve) |
-| `queue_transfer` | Transfer of `EXCLUSIVE` image between queue families (separate graphics and present queue family) |
+| `queue_transfer` | Transfer of `EXCLUSIVE` image between queue families (separate graphics and compute queue family) |
 | `vertex_offset` | Demonstrates how offset in `vkCmdBindVertexBuffers()` works |
 
 Proper renderloop synchronization mini-tutorial
@@ -41,17 +41,15 @@ the no tutorial policy above :wink::
 Requirements
 ----------------------------
 
-**OS**: Windows  
+**OS**: Windows or Linux  
 **Language**: C++14  
 **Environment**: installed (latest) LunarG SDK  
 **Environment**: preferably installed (latest) Vulkan capable drivers  
-**Environment**: MS Visual Studio, Cygwin, MinGW (or IDEs running on top of
-them)
-
-There is an untested Linux compatibility via XLib.
+**Environment**: On Windows MS Visual Studio, Cygwin, MinGW (or IDEs running on top of
+them)   
+**Environment**: On Linux g++ and libxcb-dev and libxcb-keysyms-dev
 
 TODO: Adding VkSurface function for other OSes should be straightforward though.
-I would welcome if someone PR'd it (unless I do first :smile:).
 
 Files
 ----------------------------------
@@ -106,7 +104,7 @@ in SubSystem property.
 
 In Linux distro you would do e.g.:
 
-    $ g++ --std=c++14 -Wall -m64 -D_DEBUG -I$VULKAN_SDK/include -oHelloTriangle HelloTriangle.cpp -L$VULKAN_SDK/lib -lX11 -lvulkan
+    $ g++ --std=c++14 -Wall -m64 -D_DEBUG -I$VULKAN_SDK/include -oHelloTriangle HelloTriangle.cpp -L$VULKAN_SDK/lib -lvulkan -lxcb -lxcb-keysyms
 
 Run
 ------------------------

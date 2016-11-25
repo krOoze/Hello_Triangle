@@ -94,8 +94,13 @@ PlatformWindow initWindow( int canvasWidth, int canvasHeight ){
 		&values
 	); 
 
+	const char* title = "Hello Vulkan Triangle";
+
+	XStoreName( display, window, title );
+	XSetIconName( display, window, title );
+
 	Atom WM_DELETE_WINDOW = XInternAtom( display, "WM_DELETE_WINDOW", False );
-	XSetWMProtocols( display, window, &WM_DELETE_WINDOW, 1);
+	XSetWMProtocols( display, window, &WM_DELETE_WINDOW, 1 );
 
 	XFlush( display );
 	return { display, window, visual_id };
@@ -168,6 +173,9 @@ int messageLoop( PlatformWindow window ){
 			case ConfigureNotify:{
 				XConfigureEvent ce = e.xconfigure;
 				if( ce.width != width || ce.height != height ){
+					width = ce.width;
+					height = ce.height;
+
 					sizeEventHandler();
 				}
 

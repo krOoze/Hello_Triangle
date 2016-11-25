@@ -832,15 +832,39 @@ vector<VkSurfaceFormatKHR> getSurfaceFormats( VkPhysicalDevice physicalDevice, V
 }
 
 VkSurfaceFormatKHR getSurfaceFormat( VkPhysicalDevice physicalDevice, VkSurfaceKHR surface ){
+	const VkFormat preferredFormat1 = VK_FORMAT_B8G8R8A8_UNORM; 
+	const VkFormat preferredFormat2 = VK_FORMAT_B8G8R8A8_SRGB;
+
 	vector<VkSurfaceFormatKHR> formats = getSurfaceFormats( physicalDevice, surface );
 
+	if( formats.empty() ) throw "No surface formats offered by Vulkan!";
+
+	if( formats.size() == 1 && formats[0].format == VK_FORMAT_UNDEFINED ){
+		formats[0].format = preferredFormat1;
+	}
+
+	bool found1 = false;
+	bool found2 = false;
+	VkSurfaceFormatKHR chosenFormat1;
+	VkSurfaceFormatKHR chosenFormat2;
+
 	for( auto f : formats ){
-		if( f.format == /*VK_FORMAT_B8G8R8A8_SRGB*/ VK_FORMAT_B8G8R8A8_UNORM && f.colorSpace == VK_COLORSPACE_SRGB_NONLINEAR_KHR ){
-			return f;
+		if( f.format == preferredFormat1 ){
+			chosenFormat1 = f;
+			found1 = true;
+			break;
+		}
+
+		if( f.format == preferredFormat2 ){
+			chosenFormat2 = f;
+			found2 = true;
+			break;
 		}
 	}
 
-	throw "No suitable Surface format found!";
+	if( found1 ) return chosenFormat1;
+	else if( found2 ) return chosenFormat2;
+	else return formats[0];
 }
 
 VkSurfaceCapabilitiesKHR getSurfaceCapabilities( VkPhysicalDevice physicalDevice, VkSurfaceKHR surface ){
@@ -867,14 +891,47 @@ vector<VkPresentModeKHR> getSurfacePresentModes( VkPhysicalDevice physicalDevice
 	return modes;
 }
 
+
+int selectedMode = 0;
+
+TODO( "Could use debug_report instead of couts" )
 VkPresentModeKHR getSurfacePresentMode( VkPhysicalDevice physicalDevice, VkSurfaceKHR surface ){
 	vector<VkPresentModeKHR> modes = getSurfacePresentModes( physicalDevice, surface );
 
 	for( auto m : modes ){
-		if( m == ::presentMode ) return m;
+		if( m == ::presentMode ){
+			if( selectedMode != 0 ){
+				cout << "INFO: Your preferred present mode became supported. Switching to it.\n";
+			}
+
+			selectedMode = 0;
+			return m;
+		}
 	}
 
-	throw "Your prefered present mode is not supported! Adjust your config or try FIFO (always supported).";
+
+
+	for( auto m : modes ){
+		if( m == VK_PRESENT_MODE_FIFO_KHR ){
+			if( selectedMode != 1 ){
+				cout << "WARNING: Your preferred present mode is not supported. Switching to VK_PRESENT_MODE_FIFO_KHR.\n";
+			}
+
+			selectedMode = 1;
+			return m;
+		}
+	}
+
+	TODO( "Workaround for bad drivers" )
+	if( modes.empty() ) throw "Bugged driver reports no supported present modes.";
+	else{
+		if( selectedMode != 2 ){
+			cout << "WARNING: Bugged drivers. VK_PRESENT_MODE_FIFO_KHR not supported. Switching to whatever is.\n";
+		}
+
+		selectedMode = 2;
+		return modes[0];
+	}
 }
 
 VkSwapchainKHR initSwapchain( VkPhysicalDevice physicalDevice, VkDevice device, VkSurfaceKHR surface, VkSurfaceFormatKHR surfaceFormat, VkSurfaceCapabilitiesKHR capabilities, VkSwapchainKHR oldSwapchain ){

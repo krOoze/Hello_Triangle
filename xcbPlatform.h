@@ -5,8 +5,12 @@
 
 #include <functional>
 #include <string>
+#include <cstring>
 
 #include <xcb/xcb.h>
+#include <xcb/xcb_util.h>
+#include <xcb/xcb_keysyms.h>
+#include <X11/keysym.h>
 #include <vulkan/vulkan.h>
 
 #include "CompilerMessages.h"
@@ -55,6 +59,10 @@ void showWindow( PlatformWindow window ){
 	xcb_flush( window.connection );
 }
 
+int width = -1;
+int height = -1;
+bool windowReady = false;
+
 int messageLoop( PlatformWindow window ){
 	bool quit = false;
 
@@ -62,16 +70,29 @@ int messageLoop( PlatformWindow window ){
 		xcb_generic_event_t* e = xcb_poll_for_event( window.connection );
 
 		if( e ){
-			switch( e->response_type ){
+			switch( e->response_type & ~0x80 ){
 				case XCB_EXPOSE:
 					paintEventHandler();
 					break;
 
+				case XCB_CONFIGURE_NOTIFY:{
+					xcb_configure_notify_event_t* ce = (xcb_configure_notify_event_t*)e;
+					if( ce->width != width || ce->height != height ){
+						width = ce->width;
+						height = ce->height;
+
+						sizeEventHandler();
+
+						windowReady = true;
+					}
+
+					break;
+				}
+
 				case XCB_KEY_PRESS:{
 					xcb_key_press_event_t* kpe = (xcb_key_release_event_t*)e;
 
-					/*
-					xcb_key_symbols_t* keysyms = xcb_key_symbols_alloc( connection );
+					xcb_key_symbols_t* keysyms = xcb_key_symbols_alloc( window.connection );
 
 					switch(  xcb_key_press_lookup_keysym( keysyms, kpe, 0 )  ){
 						case XK_Escape:
@@ -79,22 +100,37 @@ int messageLoop( PlatformWindow window ){
 					}
 
 					xcb_key_symbols_free( keysyms );
-					*/
 
+					/*
 					switch( kpe->detail ){
 						case 9: // ESC
 							quit = true;
 					}
+					*/
 					break;
 				}
 
-				default:
-					throw "Unrecognized event type!";
+				case XCB_CLIENT_MESSAGE:{
+					xcb_client_message_event_t* cme = (xcb_client_message_event_t*)e;
+
+					xcb_intern_atom_cookie_t wmdelCookie = xcb_intern_atom( window.connection, 1, 16, "WM_DELETE_WINDOW" );
+					xcb_intern_atom_reply_t* wmdelReply = xcb_intern_atom_reply( window.connection, wmdelCookie, 0 );
+					xcb_atom_t ATOM_WM_DELETE_WINDOW = wmdelReply->atom;
+					free( wmdelReply );
+
+					if( cme->data.data32[0] == ATOM_WM_DELETE_WINDOW ){
+						quit = true;
+					}
+					break;
+				}
+
+				//default:
+				//	throw "Unrecognized event type!";
 			}
 
 			free( e );
 		}
-		else{ // no events pending
+		else if( windowReady ){ // no events pending
 			paintEventHandler();
 		}
 	}
@@ -160,7 +196,7 @@ PlatformWindow initWindow( int canvasWidth, int canvasHeight ){
 	;
 
 	uint32_t values[] = {
-		XCB_EVENT_MASK_EXPOSURE | XCB_EVENT_MASK_KEY_PRESS
+		XCB_EVENT_MASK_EXPOSURE | XCB_EVENT_MASK_KEY_PRESS | XCB_EVENT_MASK_STRUCTURE_NOTIFY
 	};
 
 
@@ -179,6 +215,24 @@ PlatformWindow initWindow( int canvasWidth, int canvasHeight ){
 		values
 	); 
 
+	const char* title = "Hello Vulkan Triangle";
+
+  	xcb_change_property(  connection, XCB_PROP_MODE_REPLACE, window, XCB_ATOM_WM_NAME, XCB_ATOM_STRING, 8, strlen( title ), title  );
+  	xcb_change_property(  connection, XCB_PROP_MODE_REPLACE, window, XCB_ATOM_WM_ICON_NAME, XCB_ATOM_STRING, 8, strlen( title ), title  );
+
+
+	xcb_intern_atom_cookie_t wmprotCookie = xcb_intern_atom( connection, 1, 12, "WM_PROTOCOLS" );
+	xcb_intern_atom_reply_t* wmprotReply = xcb_intern_atom_reply( connection, wmprotCookie, 0 );
+	xcb_atom_t ATOM_WM_PROTOCOLS = wmprotReply->atom;
+	free( wmprotReply );
+
+	xcb_intern_atom_cookie_t wmdelCookie = xcb_intern_atom( connection, 0, 16, "WM_DELETE_WINDOW" );
+	xcb_intern_atom_reply_t* wmdelReply = xcb_intern_atom_reply( connection, wmdelCookie, 0 );
+	xcb_atom_t ATOM_WM_DELETE_WINDOW = wmdelReply->atom;
+	free( wmdelReply );
+
+	// undocumented magic from random mailing list everybody seems to use
+	xcb_change_property( connection, XCB_PROP_MODE_REPLACE, window, ATOM_WM_PROTOCOLS, XCB_ATOM_ATOM, 32, 1, &ATOM_WM_DELETE_WINDOW );
 
 	xcb_flush( connection );
 	return { connection, window, screen->root_visual };

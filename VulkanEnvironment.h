@@ -26,7 +26,7 @@ TODO( "Apparently XCB can exist in windows compiler, so shouldn't be choosing au
 	#define VK_USE_PLATFORM_WIN32_KHR
 	#include "LeanWindowsEnvironment.h" // Windows.h settings must be first -- vulkan.h does include Windows.h
 #elif defined(__linux__)
-	#define VK_USE_PLATFORM_XLIB_KHR
+	#define VK_USE_PLATFORM_XCB_KHR
 #else
 	#error "Unsupported platform"
 #endif
