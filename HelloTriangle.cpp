@@ -40,8 +40,8 @@ using std::chrono::duration;
 using std::chrono::duration_cast;
 
 #include <cmath>
-
 #include <algorithm>
+#include <functional>
 
 #include <vulkan/vulkan.h> // assume core+WSI loaded
 
@@ -93,6 +93,14 @@ const char* fragmentShaderFilename = "triangle.frag.spv";
 
 // needed stuff -- forward declarations
 ///////////////////////////////
+
+// Vulkan enumerate commands scheme
+template< typename Dispatch, typename Element, typename VkComm >
+vector<Element> enumerate( Dispatch dh, VkComm command, const char* commName );
+
+template< typename Dispatch, typename Element, typename Source, typename VkComm >
+vector<Element> enumerate( Dispatch dh, Source source, VkComm command, const char* commName );
+
 
 VkInstance initInstance( const vector<const char*> layers = {}, const vector<const char*> extensions = {} );
 void killInstance( VkInstance instance );
@@ -457,9 +465,34 @@ catch( ... ){
 // Implementation
 //////////////////////////////////
 
-void killSurface( VkInstance instance, VkSurfaceKHR surface ){
-	vkDestroySurfaceKHR( instance, surface, nullptr );
+template< typename Dispatch, typename Element, typename VkComm >
+vector<Element> enumerate( Dispatch dh, VkComm command, const char* commName ){
+	vector<Element> enumerants;
+
+	VkResult errorCode;
+	uint32_t enumerantsCount;
+	do{
+		errorCode = command( dh, &enumerantsCount, nullptr ); RESULT_HANDLER( errorCode, commName );
+
+		enumerants.resize( enumerantsCount );
+		errorCode = command( dh, &enumerantsCount, enumerants.data() );
+	} while( errorCode == VK_INCOMPLETE );
+
+	RESULT_HANDLER( errorCode, commName );
+
+	enumerants.resize( enumerantsCount ); // if enumerantsCount1 > enumerantsCount2
+
+	return enumerants;
 }
+
+
+template< typename Dispatch, typename Element, typename Source, typename VkComm >
+vector<Element> enumerate( Dispatch dh, Source source, VkComm command, const char* commName ){
+	auto bc = std::bind( command, std::placeholders::_1, source, std::placeholders::_2, std::placeholders::_3 );
+
+	return enumerate< Dispatch, Element, decltype(bc) >( dh, bc, commName );
+}
+
 
 VkInstance initInstance( const vector<const char*> layers, const vector<const char*> extensions ){
 	VkApplicationInfo appInfo = {};
@@ -509,20 +542,11 @@ void killInstance( VkInstance instance ){
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 vector<VkPhysicalDevice> getPhysicalDevices( VkInstance instance ){
-	vector<VkPhysicalDevice> devices;
-
-	VkResult errorCode;
-	do{
-		uint32_t deviceCount = 0;
-		errorCode = vkEnumeratePhysicalDevices( instance, &deviceCount, nullptr ); RESULT_HANDLER( errorCode, "vkEnumeratePhysicalDevices" );
-
-		devices.resize( deviceCount );
-		errorCode = vkEnumeratePhysicalDevices( instance, &deviceCount, devices.data() );
-	} while( errorCode == VK_INCOMPLETE );
-
-	RESULT_HANDLER( errorCode, "vkEnumeratePhysicalDevices" );
-
-	return devices;
+	return enumerate< VkInstance, VkPhysicalDevice, decltype(vkEnumeratePhysicalDevices) >(
+		instance,
+		vkEnumeratePhysicalDevices,
+		"vkEnumeratePhysicalDevices"
+	);
 }
 
 VkPhysicalDevice getPhysicalDevice( VkInstance instance ){
@@ -814,21 +838,19 @@ void killImageView( VkDevice device, VkImageView imageView ){
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+// initSurface is platform dependent
+
+void killSurface( VkInstance instance, VkSurfaceKHR surface ){
+	vkDestroySurfaceKHR( instance, surface, nullptr );
+}
+
 vector<VkSurfaceFormatKHR> getSurfaceFormats( VkPhysicalDevice physicalDevice, VkSurfaceKHR surface ){
-	vector<VkSurfaceFormatKHR> formats;
-
-	VkResult errorCode;
-	do{
-		uint32_t formatCount = 0;
-		errorCode = vkGetPhysicalDeviceSurfaceFormatsKHR( physicalDevice, surface, &formatCount, nullptr ); RESULT_HANDLER( errorCode, "vkGetPhysicalDeviceSurfaceFormatsKHR" );
-
-		formats.resize( formatCount );
-		errorCode = vkGetPhysicalDeviceSurfaceFormatsKHR( physicalDevice, surface, &formatCount, formats.data() );
-	} while( errorCode == VK_INCOMPLETE );
-
-	RESULT_HANDLER( errorCode, "vkGetPhysicalDeviceSurfaceFormatsKHR" );
-
-	return formats;
+	return enumerate< VkPhysicalDevice, VkSurfaceFormatKHR, VkSurfaceKHR, decltype(vkGetPhysicalDeviceSurfaceFormatsKHR) >(
+		physicalDevice,
+		surface,
+		vkGetPhysicalDeviceSurfaceFormatsKHR,
+		"vkGetPhysicalDeviceSurfaceFormatsKHR"
+	);
 }
 
 VkSurfaceFormatKHR getSurfaceFormat( VkPhysicalDevice physicalDevice, VkSurfaceKHR surface ){
@@ -875,20 +897,12 @@ VkSurfaceCapabilitiesKHR getSurfaceCapabilities( VkPhysicalDevice physicalDevice
 }
 
 vector<VkPresentModeKHR> getSurfacePresentModes( VkPhysicalDevice physicalDevice, VkSurfaceKHR surface ){
-	vector<VkPresentModeKHR> modes;
-
-	VkResult errorCode;
-	do{
-		uint32_t modeCount = 0;
-		errorCode = vkGetPhysicalDeviceSurfacePresentModesKHR( physicalDevice, surface, &modeCount, nullptr ); RESULT_HANDLER( errorCode, "vkGetPhysicalDeviceSurfacePresentModesKHR" );
-
-		modes.resize( modeCount );
-		errorCode = vkGetPhysicalDeviceSurfacePresentModesKHR( physicalDevice, surface, &modeCount, modes.data() );
-	} while( errorCode == VK_INCOMPLETE );
-
-	RESULT_HANDLER( errorCode, "vkGetPhysicalDeviceSurfacePresentModesKHR" );
-
-	return modes;
+		return enumerate< VkPhysicalDevice, VkPresentModeKHR, VkSurfaceKHR, decltype(vkGetPhysicalDeviceSurfacePresentModesKHR) >(
+			physicalDevice,
+			surface,
+			vkGetPhysicalDeviceSurfacePresentModesKHR,
+			"vkGetPhysicalDeviceSurfacePresentModesKHR"
+		);
 }
 
 
@@ -985,20 +999,12 @@ void killSwapchain( VkDevice device, VkSwapchainKHR swapchain ){
 }
 
 vector<VkImage> getSwapchainImages( VkDevice device, VkSwapchainKHR swapchain ){
-	vector<VkImage> images;
-
-	VkResult errorCode;
-	do{
-		uint32_t imageCount = 0;
-		errorCode = vkGetSwapchainImagesKHR( device, swapchain, &imageCount, nullptr ); RESULT_HANDLER( errorCode, "vkGetSwapchainImagesKHR" );
-
-		images.resize( imageCount );
-		errorCode = vkGetSwapchainImagesKHR(  device, swapchain, &imageCount, images.data() );
-	} while( errorCode == VK_INCOMPLETE );
-
-	RESULT_HANDLER( errorCode, "vkGetSwapchainImagesKHR" );
-
-	return images;
+	return enumerate< VkDevice, VkImage, VkSwapchainKHR, decltype(vkGetSwapchainImagesKHR) >(
+		device,
+		swapchain,
+		vkGetSwapchainImagesKHR,
+		"vkGetSwapchainImagesKHR"
+	);
 }
 
 uint32_t getNextImageIndex( VkDevice device, VkSwapchainKHR swapchain, VkSemaphore imageReadyS ){
