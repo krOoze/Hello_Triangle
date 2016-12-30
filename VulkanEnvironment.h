@@ -13,7 +13,7 @@
 #include "CompilerMessages.h"
 
 // platform specific settings
-TODO( "Apparently XCB can exist in windows compiler, so shouldn't be choosing automatically." )
+TODO( "Apparently XCB can exist in windows compiler, so shouldn't maybe choosing automatically?" )
 
 #if defined(_WIN32)
 	#define VK_USE_PLATFORM_WIN32_KHR

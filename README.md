@@ -74,6 +74,7 @@ variables in `HelloTriangle.cpp`.
 |---|---|---|
 | `debugVulkan` | Turns debug output and validation layers on | tries to choose based on compiler debug mode |
 | `debugAmount` | Which kinds of debug messages will be shown | `WARNING` \| `PERFORMANCE_WARNING` \| `ERROR` |
+| `fpsCounter` | Enable FPS counter via `VK_LAYER_LUNARG_monitor` layer | `true` |
 | `initialWindowWidth` | The initial width of the rendered window | `800` |
 | `initialWindowHeight` | The initial height of the rendered window | `800` |
 | `presentMode` | The presentation mode of Vulkan used in swapchain | `VK_PRESENT_MODE_FIFO_KHR` <sup>1</sup>|
@@ -82,8 +83,8 @@ variables in `HelloTriangle.cpp`.
 | `fragmentShaderFilename` | The file with the SPIR-V fragment shader program | `triangle.frag.spv` |
 
 <sup>1</sup> I preferred `VK_PRESENT_MODE_IMMEDIATE_KHR` before but it tends to
-make coil whine because of the exteme FPS (which could be even dangerous to the
-PCB).
+make coil whine because of the exteme FPS (which could be unnecessarily
+dangerous to the PCB).
 
 Build
 ----------------------------------------------
@@ -105,6 +106,9 @@ in SubSystem property.
 In Linux distro you would do e.g.:
 
     $ g++ --std=c++14 -Wall -m64 -D_DEBUG -I$VULKAN_SDK/include -oHelloTriangle HelloTriangle.cpp -L$VULKAN_SDK/lib -lvulkan -lxcb -lxcb-keysyms
+
+There are annoying (on purpose) TODOs generated on build. They can be disabled
+by defining `NO_TODO`.
 
 Run
 ------------------------

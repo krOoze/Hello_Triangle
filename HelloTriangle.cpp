@@ -34,17 +34,13 @@ using std::ifstream;
 #include <iterator>
 using std::istreambuf_iterator;
 
-#include <chrono>
-using std::chrono::steady_clock;
-using std::chrono::duration;
-using std::chrono::duration_cast;
-
 #include <cmath>
 #include <algorithm>
 #include <functional>
 
 #include <vulkan/vulkan.h> // assume core+WSI loaded
 
+#include "to_string.h"
 #include "ErrorHandling.h"
 #include "Vertex.h"
 
@@ -77,6 +73,8 @@ constexpr VkDebugReportFlagsEXT debugAmount =
 constexpr bool debugVulkan = false;
 constexpr VkDebugReportFlagsEXT debugAmount = 0;
 #endif
+
+constexpr bool fpsCounter = true;
 
 // window and swapchain
 constexpr int initialWindowWidth = 800;
@@ -247,8 +245,10 @@ int main() try{
 		{ /*lb*/ { -0.5f * triangleSize,  sqrtf( 3.0f ) * 0.25f * triangleSize }, /*B*/{ 0.0f, 0.0f, 1.0f }  }
 	};
 
+	TODO( "Should create path for the case the layers do not exist." )
 	vector<const char*> layers;
 	if( ::debugVulkan ) layers.push_back( "VK_LAYER_LUNARG_standard_validation" );
+	if( ::fpsCounter ) layers.push_back( "VK_LAYER_LUNARG_monitor" );
 
 	vector<const char*> instanceExtensions = { VK_KHR_SURFACE_EXTENSION_NAME, PLATFORM_SURFACE_EXTENSION_NAME };
 	if( ::debugVulkan ) instanceExtensions.push_back( VK_EXT_DEBUG_REPORT_EXTENSION_NAME );
@@ -323,7 +323,6 @@ int main() try{
 
 	auto recreateSwapchain = [&](){
 		// swapchain recreation -- will be done before the first frame too;
-		TODO( "Should substract all of this from the timer. But it is not serious measurement anyway..." )
 
 		VkResult errorCode = vkDeviceWaitIdle( device ); RESULT_HANDLER( errorCode, "vkDeviceWaitIdle" );
 
@@ -370,9 +369,6 @@ int main() try{
 		renderDoneS = initSemaphore( device );
 	};
 
-	// lets have simple non-robust performance info for fun
-	unsigned frames = 0;
-	steady_clock::time_point start = steady_clock::now();
 
 	// Finally, rendering! Yay!
 	std::function<void(void)> render = [&](){
@@ -381,7 +377,6 @@ int main() try{
 
 			submitToQueue( queue, commandBuffers[nextSwapchainImageIndex], imageReadyS, renderDoneS );
 			present( queue, swapchain, nextSwapchainImageIndex, renderDoneS );
-			++frames;
 		}
 		catch( VulkanResultException ex ){
 			if( ex.result == VK_SUBOPTIMAL_KHR || ex.result == VK_ERROR_OUT_OF_DATE_KHR ){
@@ -407,9 +402,6 @@ int main() try{
 	// proper Vulkan cleanup
 	VkResult errorCode = vkDeviceWaitIdle( device ); RESULT_HANDLER( errorCode, "vkDeviceWaitIdle" );
 
-	steady_clock::time_point end = steady_clock::now();
-	duration<double> time_span = duration_cast<duration<double>>( end - start );
-	cout << "Rendered " << frames << " frames in " << time_span.count() << " seconds. Average FPS is " << frames / time_span.count() << endl;
 
 	// kill swapchain
 	killSemaphore( device, imageReadyS );
@@ -554,7 +546,7 @@ VkPhysicalDevice getPhysicalDevice( VkInstance instance ){
 
 	if( devices.empty() ) throw "No VkPhysicalDevice found!";
 	else if( devices.size() > 1 ){
-		cout << "WARNING: More than one VkPhysicalDevice found - just picking the first one.\n";
+		cout << "INFO: More than one VkPhysicalDevice found - just picking the first one.\n";
 	}
 
 	TODO( "Should try to pick the best, not first" )
@@ -865,27 +857,22 @@ VkSurfaceFormatKHR getSurfaceFormat( VkPhysicalDevice physicalDevice, VkSurfaceK
 		formats[0].format = preferredFormat1;
 	}
 
-	bool found1 = false;
-	bool found2 = false;
-	VkSurfaceFormatKHR chosenFormat1;
-	VkSurfaceFormatKHR chosenFormat2;
+	VkSurfaceFormatKHR chosenFormat1 = {VK_FORMAT_UNDEFINED};
+	VkSurfaceFormatKHR chosenFormat2 = {VK_FORMAT_UNDEFINED};
 
 	for( auto f : formats ){
 		if( f.format == preferredFormat1 ){
 			chosenFormat1 = f;
-			found1 = true;
 			break;
 		}
 
 		if( f.format == preferredFormat2 ){
 			chosenFormat2 = f;
-			found2 = true;
-			break;
 		}
 	}
 
-	if( found1 ) return chosenFormat1;
-	else if( found2 ) return chosenFormat2;
+	if( chosenFormat1.format ) return chosenFormat1;
+	else if( chosenFormat2.format ) return chosenFormat2;
 	else return formats[0];
 }
 
@@ -936,7 +923,7 @@ VkPresentModeKHR getSurfacePresentMode( VkPhysicalDevice physicalDevice, VkSurfa
 		}
 	}
 
-	TODO( "Workaround for bad drivers" )
+	TODO( "Workaround for bad (Intel Linux Mesa) drivers" )
 	if( modes.empty() ) throw "Bugged driver reports no supported present modes.";
 	else{
 		if( selectedMode != 2 ){
@@ -949,16 +936,13 @@ VkPresentModeKHR getSurfacePresentMode( VkPhysicalDevice physicalDevice, VkSurfa
 }
 
 VkSwapchainKHR initSwapchain( VkPhysicalDevice physicalDevice, VkDevice device, VkSurfaceKHR surface, VkSurfaceFormatKHR surfaceFormat, VkSurfaceCapabilitiesKHR capabilities, VkSwapchainKHR oldSwapchain ){
-	if(  !( capabilities.supportedUsageFlags & VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT )  ){
-		throw "VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT not supported!";
-	}
-
 	TODO( "Perhaps not really necessary to have VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR" )
 	if(  !( capabilities.supportedCompositeAlpha & VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR )  ){
 		throw "VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR not supported!";
 	}
 
 	// for all modes having at least two Images can be beneficial
+	TODO( "Or is it minImageCount + 1 ? Gotta think this through." )
 	uint32_t minImageCount = std::max<uint32_t>( 2, capabilities.minImageCount );
 	if( capabilities.maxImageCount ) minImageCount = std::min<uint32_t>( minImageCount, capabilities.maxImageCount );
 
@@ -993,8 +977,6 @@ VkSwapchainKHR initSwapchain( VkPhysicalDevice physicalDevice, VkDevice device, 
 }
 
 void killSwapchain( VkDevice device, VkSwapchainKHR swapchain ){
-	TODO( "This is a workaround for bad drivers" )
-	if( swapchain == VK_NULL_HANDLE ) return;
 	vkDestroySwapchainKHR( device, swapchain, nullptr );
 }
 
@@ -1450,8 +1432,6 @@ VkSemaphore initSemaphore( VkDevice device ){
 }
 
 void killSemaphore( VkDevice device, VkSemaphore semaphore ){
-	TODO( "This is a workaround for bad drivers" )
-	if( semaphore == VK_NULL_HANDLE ) return;
 	vkDestroySemaphore( device, semaphore, nullptr );
 }
 
@@ -1540,6 +1520,9 @@ void recordBindVertexBuffer( VkCommandBuffer commandBuffer, const uint32_t verte
 }
 
 void recordSetViewport( VkCommandBuffer commandBuffer, uint32_t width, uint32_t height ){
+	if( width == 0 ) width = 1;
+	if( height == 0 ) height = 1;
+
 	VkViewport viewport{
 		0.0f, // x
 		0.0f, // y

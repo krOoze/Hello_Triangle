@@ -4,9 +4,12 @@
 #define COMMON_WIN32_WSI_H
 
 #include <functional>
+#include <string>
 
 #include <Windows.h>
 #include <vulkan/vulkan.h>
+
+#include "to_string.h"
 
 #include "CompilerMessages.h"
 
