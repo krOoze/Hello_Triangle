@@ -48,8 +48,10 @@ Requirements
 **Environment**: On Windows MS Visual Studio, Cygwin, MinGW (or IDEs running on top of
 them)   
 **Environment**: On Linux g++ and libxcb-dev and libxcb-keysyms-dev
+**Environment[Optional]**: Optionally GLFW 3.2+
 
-TODO: Adding VkSurface function for other OSes should be straightforward though.
+TODO: Adding VkSurface function for other OSes should be straightforward though
+using the provided ones as template for it.
 
 Files
 ----------------------------------
@@ -58,7 +60,15 @@ Files
 |---|---|
 | HelloTriangle.cpp | The app souce code including `main` function |
 | VulkanEnvironment.h | Includes `vulkan.h` and the necessary platform headers |
-| LeanWindowsEnvironment.h | Included by `VulkanEnvironment.h` and includes lean `windows.h` header |
+| LeanWindowsEnvironment.h | Included conditionally by `VulkanEnvironment.h` and includes lean `windows.h` header |
+| CompilerMessages.h | Allows to make compile-time messages shown in the compiler output |
+| ErrorHandling.h | `VkResult` check helpers + `VK_EXT_debug_report` extension related stuff |
+| glfwPlatform.h | WSI platform-dependent stuff via GLFW3 library |
+| win32Platform.h | WSI Win32 platform-dependent stuff |
+| xcbPlatform.h | WSI XCB platform-dependent stuff |
+| xlibPlatform.h | WSI XLIB platform-dependent stuff |
+| Vertex.h | Just simple Vertex definitions |
+| to_string.h | Workaround for broken Standard C++ library in MinGW |
 | triangle.vert | The vertex shader program in GLSL |
 | triangle.frag | The fragment shader program in GLSL |
 | triangle.vert.spv | triangle.vert pre-transcripted to SPIR-V for convenience |
@@ -95,13 +105,13 @@ In Cygwin you can build it e.g. thusly (for x64):
 
 In MinGW like so:
 
-    $ g++ -std=c++14 -Wall -m32 -mwindows -Wl,--subsystem,console -D_DEBUG -I$VULKAN_SDK/Include -oHelloTriangle HelloTriangle.cpp -L$VULKAN_SDK/Bin32 -lvulkan-1
+    $ g++ -std=c++14 -Wall -m32 -mwindows -Wl,--subsystem,console -D_DEBUG -I$VULKAN_SDK/Include -oHelloTriangle HelloTriangle.cpp -L$VULKAN_SDK/Bin32 -lvulkan-1 -L/path/to/GLFW/ -lglfw3
 
 In MS Visual Studio you can create Solution for it.  
 You would add `$(VULKAN_SDK)\Include` to the the Additional Include Directories
-and `$(VULKAN_SDK)\Bin\vulkan-1.lib` (or `Bin32` for x86) to the Additional
-Dependencies property. You may choose between `windows` or `console` subsystem
-in SubSystem property.
+and `$(VULKAN_SDK)\Bin\vulkan-1.lib` (or `Bin32` for x86) and `glfw3.lib` to the
+Additional Dependencies property. You may choose between `windows` or `console`
+subsystem in SubSystem property.
 
 In Linux distro you would do e.g.:
 
@@ -109,6 +119,10 @@ In Linux distro you would do e.g.:
 
 There are annoying (on purpose) TODOs generated on build. They can be disabled
 by defining `NO_TODO`.
+
+Using GLFW is optional. You may choose another windowing platform in
+`VulkanEnvironment.h`. All platforms use GLFW by default except Cygwin (which
+uses Win32 directly to reduce dependencies on X11).
 
 Run
 ------------------------

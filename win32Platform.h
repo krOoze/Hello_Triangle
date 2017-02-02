@@ -15,12 +15,13 @@
 
 
 TODO( "Easier to use, but might prevent platform co-existence. Could be namespaced. Make all of this a class?" )
-#define PLATFORM_SURFACE_EXTENSION_NAME VK_KHR_WIN32_SURFACE_EXTENSION_NAME
 struct PlatformWindow{ HINSTANCE hInstance; HWND hWnd; };
+
+std::string getPlatformSurfaceExtensionName(){ return VK_KHR_WIN32_SURFACE_EXTENSION_NAME; };
 
 int messageLoop( PlatformWindow window );
 
-bool platformPresentationSupport( VkPhysicalDevice device, uint32_t queueFamilyIndex, PlatformWindow window );
+bool platformPresentationSupport( VkInstance instance, VkPhysicalDevice device, uint32_t queueFamilyIndex, PlatformWindow window );
 
 PlatformWindow initWindow( int canvasWidth, int canvasHeight );
 void killWindow( PlatformWindow window );
@@ -128,7 +129,9 @@ LRESULT CALLBACK wndProc( HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam ){
 }
 
 
-bool platformPresentationSupport( VkPhysicalDevice device, uint32_t queueFamilyIndex, PlatformWindow ){
+bool platformPresentationSupport( VkInstance instance, VkPhysicalDevice device, uint32_t queueFamilyIndex, PlatformWindow ){
+	UNREFERENCED_PARAMETER( instance );
+
 	return vkGetPhysicalDeviceWin32PresentationSupportKHR( device, queueFamilyIndex ) == VK_TRUE;
 }
 

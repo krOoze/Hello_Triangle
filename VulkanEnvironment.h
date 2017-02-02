@@ -13,24 +13,30 @@
 #include "CompilerMessages.h"
 
 // platform specific settings
-TODO( "Apparently XCB can exist in windows compiler, so shouldn't maybe choosing automatically?" )
 
 #if defined(_WIN32)
-	#define VK_USE_PLATFORM_WIN32_KHR
+	#define USE_PLATFORM_GLFW
+	//#define VK_USE_PLATFORM_WIN32_KHR
 	#define _CRT_SECURE_NO_WARNINGS
-	#include "LeanWindowsEnvironment.h" // Windows.h settings must be first -- vulkan.h does include Windows.h
+	//#include "LeanWindowsEnvironment.h" // Windows.h settings must be first -- vulkan.h does include Windows.h
 #elif defined(__CYGWIN__)
 	#define VK_USE_PLATFORM_WIN32_KHR
 	#include "LeanWindowsEnvironment.h" // Windows.h settings must be first -- vulkan.h does include Windows.h
 #elif defined(__MINGW32__)
-	#define VK_USE_PLATFORM_WIN32_KHR
-	#include "LeanWindowsEnvironment.h" // Windows.h settings must be first -- vulkan.h does include Windows.h
+	#define USE_PLATFORM_GLFW
+	//#define VK_USE_PLATFORM_WIN32_KHR
+	//#include "LeanWindowsEnvironment.h" // Windows.h settings must be first -- vulkan.h does include Windows.h
 #elif defined(__linux__)
-	#define VK_USE_PLATFORM_XCB_KHR
+	#define USE_PLATFORM_GLFW
+	//#define VK_USE_PLATFORM_XCB_KHR
 #else
-	#error "Unsupported platform"
+	//#error "Unsupported platform"
 #endif
 
 TODO( "Add other (all would be awesome) platforms" )
+
+#if defined(_WIN32)
+	#define _CRT_SECURE_NO_WARNINGS
+#endif
 
 #endif //COMMON_VULKAN_ENVIRONMENT_H

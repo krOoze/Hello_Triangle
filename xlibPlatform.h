@@ -14,13 +14,14 @@
 
 
 TODO( "Easier to use, but might prevent platform co-existence. Could be namespaced. Make all of this a class?" )
-#define PLATFORM_SURFACE_EXTENSION_NAME VK_KHR_XLIB_SURFACE_EXTENSION_NAME
 struct PlatformWindow{ Display* display; Window window; VisualID visual_id; };
+
+std::string getPlatformSurfaceExtensionName(){ return VK_KHR_XLIB_SURFACE_EXTENSION_NAME; };
 
 PlatformWindow initWindow( int canvasWidth, int canvasHeight );
 void killWindow( PlatformWindow window );
 
-bool platformPresentationSupport( VkPhysicalDevice device, uint32_t queueFamilyIndex, PlatformWindow window );
+bool platformPresentationSupport( VkInstance instance, VkPhysicalDevice device, uint32_t queueFamilyIndex, PlatformWindow window );
 
 VkSurfaceKHR initSurface( VkInstance instance, PlatformWindow window );
 // killSurface() is not platform dependent
@@ -113,7 +114,7 @@ void killWindow( PlatformWindow window ){
 	killXlibDisplay( window.display );
 }
 
-bool platformPresentationSupport( VkPhysicalDevice device, uint32_t queueFamilyIndex, PlatformWindow window ){
+bool platformPresentationSupport( VkInstance instance, VkPhysicalDevice device, uint32_t queueFamilyIndex, PlatformWindow window ){
 	return vkGetPhysicalDeviceXlibPresentationSupportKHR( device, queueFamilyIndex, window.display, window.visual_id ) == VK_TRUE;
 }
 

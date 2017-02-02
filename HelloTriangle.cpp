@@ -44,7 +44,9 @@ using std::istreambuf_iterator;
 #include "ErrorHandling.h"
 #include "Vertex.h"
 
-#if defined(VK_USE_PLATFORM_WIN32_KHR)
+#if defined(USE_PLATFORM_GLFW)
+	#include "glfwPlatform.h"
+#elif defined(VK_USE_PLATFORM_WIN32_KHR)
 	#include "win32Platform.h"
 #elif defined(VK_USE_PLATFORM_XLIB_KHR)
 	#include "xlibPlatform.h"
@@ -245,12 +247,13 @@ int main() try{
 		{ /*lb*/ { -0.5f * triangleSize,  sqrtf( 3.0f ) * 0.25f * triangleSize }, /*B*/{ 0.0f, 0.0f, 1.0f }  }
 	};
 
-	TODO( "Should create path for the case the layers do not exist." )
+	TODO( "Should create path for the case these layers do not exist. At least both are tied to config variables though." )
 	vector<const char*> layers;
 	if( ::debugVulkan ) layers.push_back( "VK_LAYER_LUNARG_standard_validation" );
 	if( ::fpsCounter ) layers.push_back( "VK_LAYER_LUNARG_monitor" );
 
-	vector<const char*> instanceExtensions = { VK_KHR_SURFACE_EXTENSION_NAME, PLATFORM_SURFACE_EXTENSION_NAME };
+	auto platformSurfaceExtension = getPlatformSurfaceExtensionName();
+	vector<const char*> instanceExtensions = { VK_KHR_SURFACE_EXTENSION_NAME, platformSurfaceExtension.c_str() };
 	if( ::debugVulkan ) instanceExtensions.push_back( VK_EXT_DEBUG_REPORT_EXTENSION_NAME );
 
 	VkInstance instance = initInstance(
