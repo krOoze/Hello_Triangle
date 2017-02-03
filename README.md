@@ -47,7 +47,7 @@ Requirements
 **Environment**: preferably installed (latest) Vulkan capable drivers  
 **Environment**: On Windows MS Visual Studio, Cygwin, MinGW (or IDEs running on top of
 them)   
-**Environment**: On Linux g++ and libxcb-dev and libxcb-keysyms-dev
+**Environment**: On Linux g++ and libxcb-dev and libxcb-keysyms-dev  
 **Environment[Optional]**: Optionally GLFW 3.2+
 
 TODO: Adding VkSurface function for other OSes should be straightforward though
