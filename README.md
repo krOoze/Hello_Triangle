@@ -130,3 +130,6 @@ Run
 You just run it as you would anything else. You just need to make sure
 `triangle.vert.spv` and `triangle.frag.spv` files are visible to the binary
 (e.g. in the same folder).
+
+<kbd>Esc</kbd> does terminate the app.  
+<kbd>Alt</kbd> + <kbd>Enter</kbd> toggles fullscreen if using GLFW.
