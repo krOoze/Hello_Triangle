@@ -38,6 +38,8 @@ using std::istreambuf_iterator;
 #include <algorithm>
 #include <functional>
 
+#include <cassert>
+
 #include <vulkan/vulkan.h> // assume core+WSI loaded
 
 #include "to_string.h"
@@ -375,6 +377,8 @@ int main() try{
 
 	// Finally, rendering! Yay!
 	std::function<void(void)> render = [&](){
+		assert( swapchain != VK_NULL_HANDLE );
+
 		try{
 			uint32_t nextSwapchainImageIndex = getNextImageIndex( device, swapchain, imageReadyS );
 
