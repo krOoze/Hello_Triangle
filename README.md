@@ -1,5 +1,6 @@
 Hello Triangle Vulkan demo
 =========================
+[Warning] Currently does not work with 1.0.42 SDK if layers are enabled.
 
 This is a traditional Hello World style application for graphical APIs (for
 Vulkan in this case). It renders a RGB shaded equilateral triangle (well, if the
