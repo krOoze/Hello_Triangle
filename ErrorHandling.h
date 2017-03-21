@@ -28,7 +28,7 @@ struct VulkanResultException{
 
 
 VKAPI_ATTR VkBool32 VKAPI_CALL genericDebugCallback(
-	VkFlags msgFlags,
+	VkDebugReportFlagsEXT msgFlags,
 	VkDebugReportObjectTypeEXT objType,
 	uint64_t srcObject,
 	size_t /*location*/,
@@ -115,7 +115,7 @@ const char* to_string( VkDebugReportObjectTypeEXT o ){
 }
 
 VKAPI_ATTR VkBool32 VKAPI_CALL genericDebugCallback(
-	VkFlags msgFlags,
+	VkDebugReportFlagsEXT msgFlags,
 	VkDebugReportObjectTypeEXT objType,
 	uint64_t srcObject,
 	size_t /*location*/,
