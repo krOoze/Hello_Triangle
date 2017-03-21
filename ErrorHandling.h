@@ -114,6 +114,43 @@ const char* to_string( VkDebugReportObjectTypeEXT o ){
 	}
 }
 
+string d_to_string( VkDebugReportFlagsEXT msgFlags ){
+	string res;
+	bool first = true;
+
+	if( msgFlags & VK_DEBUG_REPORT_ERROR_BIT_EXT ){
+		if( !first ) res += " | ";
+		res += "ERROR";
+		first = false;
+	}
+
+	if( msgFlags & VK_DEBUG_REPORT_WARNING_BIT_EXT ){
+		if( !first ) res += " | ";
+		res += "WARNING";
+		first = false;
+	}
+
+	if( msgFlags & VK_DEBUG_REPORT_PERFORMANCE_WARNING_BIT_EXT ){
+		if( !first ) res += " | ";
+		res += "PERFORMANCE";
+		first = false;
+	}
+
+	if( msgFlags & VK_DEBUG_REPORT_INFORMATION_BIT_EXT ){
+		if( !first ) res += " | ";
+		res += "Info";
+		first = false;
+	}
+
+	if( msgFlags & VK_DEBUG_REPORT_DEBUG_BIT_EXT ){
+		if( !first ) res += " | ";
+		res += "Debug";
+		first = false;
+	}
+
+	return res;
+}
+
 VKAPI_ATTR VkBool32 VKAPI_CALL genericDebugCallback(
 	VkDebugReportFlagsEXT msgFlags,
 	VkDebugReportObjectTypeEXT objType,
@@ -127,44 +164,19 @@ VKAPI_ATTR VkBool32 VKAPI_CALL genericDebugCallback(
 	using std::cout;
 	using std::endl;
 
-	string report = to_string( objType ) + to_string( srcObject ) + ": " + to_string( msgCode ) + ", " + pLayerPrefix + ", " + pMsg;;
+	string report = d_to_string( msgFlags ) + ": " + to_string( objType ) + to_string( srcObject ) + ": " + to_string( msgCode ) + ", " + pLayerPrefix + ", " + pMsg;;
 
-	switch( msgFlags ){
-		case VK_DEBUG_REPORT_INFORMATION_BIT_EXT:
-			cout << "Info: " << report << endl;
-			break;
-
-		case VK_DEBUG_REPORT_WARNING_BIT_EXT:
+	if( (msgFlags & VK_DEBUG_REPORT_ERROR_BIT_EXT) || (msgFlags & VK_DEBUG_REPORT_WARNING_BIT_EXT) || (msgFlags & VK_DEBUG_REPORT_PERFORMANCE_WARNING_BIT_EXT) ){
+			cout << "\n!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n";
+			cout << report;
+			cout << "\n!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n";
 			cout << endl;
-			cout << "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n";
-			cout << "WARNING: " << report << endl;
-			cout << "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n";
-			cout << endl;
-			break;
-
-		case VK_DEBUG_REPORT_PERFORMANCE_WARNING_BIT_EXT:
-			cout << endl;
-			cout << "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n";
-			cout << "PERFORMANCE: " << report << endl;;
-			cout << "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n";
-			cout << endl;
-			break;
-
-		case VK_DEBUG_REPORT_ERROR_BIT_EXT:
-			cout << endl;
-			cout << "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n";
-			cout << "ERROR: " << report << endl;;
-			cout << "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n";
-			cout << endl;
-			break;
-
-		case VK_DEBUG_REPORT_DEBUG_BIT_EXT:
-			report += "Debug: ";
-			break;
+	}
+	else{
+		cout << report << endl;
 	}
 
-	// no abort on misbehaving command
-	return VK_FALSE;
+	return VK_FALSE; // no abort on misbehaving command
 }
 
 
