@@ -69,6 +69,8 @@ Files
 | xcbPlatform.h | WSI XCB platform-dependent stuff |
 | xlibPlatform.h | WSI XLIB platform-dependent stuff |
 | Vertex.h | Just simple Vertex definitions |
+| EnumerateScheme.h | A scheme to unify usage of all Vulkan `vkEnumerate*` commands |
+| FunctionTraits.h | A template to get type information about functions (to enable EnumerateScheme.h magic) |
 | to_string.h | Workaround for broken Standard C++ library in MinGW |
 | triangle.vert | The vertex shader program in GLSL |
 | triangle.frag | The fragment shader program in GLSL |
@@ -116,7 +118,7 @@ subsystem in SubSystem property.
 
 In Linux distro you would do e.g.:
 
-    $ g++ --std=c++14 -Wall -m64 -D_DEBUG -I$VULKAN_SDK/include -oHelloTriangle HelloTriangle.cpp -L$VULKAN_SDK/lib -lvulkan -lxcb -lxcb-keysyms
+    $ g++ --std=c++14 -Wall -m64 -D_DEBUG -I$VULKAN_SDK/include -oHelloTriangle HelloTriangle.cpp -L$VULKAN_SDK/lib -lglfw3
 
 There are annoying (on purpose) TODOs generated on build. They can be disabled
 by defining `NO_TODO`.

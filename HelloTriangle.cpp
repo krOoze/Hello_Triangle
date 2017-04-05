@@ -45,6 +45,7 @@ using std::istreambuf_iterator;
 #include "to_string.h"
 #include "ErrorHandling.h"
 #include "Vertex.h"
+#include "EnumerateScheme.h"
 
 #if defined(USE_PLATFORM_GLFW)
 	#include "glfwPlatform.h"
@@ -88,21 +89,13 @@ constexpr int initialWindowHeight = 800;
 constexpr VkPresentModeKHR presentMode = VK_PRESENT_MODE_FIFO_KHR;
 
 // pipeline settings
-constexpr VkClearValue clearColor = { {0.1f, 0.1f, 0.1f, 1.0f} };
+constexpr VkClearValue clearColor = {  { {0.1f, 0.1f, 0.1f, 1.0f} }  };
 
 const char* vertexShaderFilename = "triangle.vert.spv";
 const char* fragmentShaderFilename = "triangle.frag.spv";
 
 // needed stuff -- forward declarations
 ///////////////////////////////
-
-// Vulkan enumerate commands scheme
-template< typename Dispatch, typename Element, typename VkComm >
-vector<Element> enumerate( Dispatch dh, VkComm command, const char* commName );
-
-template< typename Dispatch, typename Element, typename Source, typename VkComm >
-vector<Element> enumerate( Dispatch dh, Source source, VkComm command, const char* commName );
-
 
 VkInstance initInstance( const vector<const char*> layers = {}, const vector<const char*> extensions = {} );
 void killInstance( VkInstance instance );
@@ -244,9 +237,9 @@ int main() try{
 
 	const float triangleSize = 1.6f;
 	vector<Vertex2D_ColorF_pack> triangle = {
-		{ /*rb*/ {  0.5f * triangleSize,  sqrtf( 3.0f ) * 0.25f * triangleSize }, /*R*/{ 1.0f, 0.0f, 0.0f }  },
-		{ /* t*/ {                 0.0f, -sqrtf( 3.0f ) * 0.25f * triangleSize }, /*G*/{ 0.0f, 1.0f, 0.0f }  },
-		{ /*lb*/ { -0.5f * triangleSize,  sqrtf( 3.0f ) * 0.25f * triangleSize }, /*B*/{ 0.0f, 0.0f, 1.0f }  }
+		{ /*rb*/ { { 0.5f * triangleSize,  sqrtf( 3.0f ) * 0.25f * triangleSize} }, /*R*/{ {1.0f, 0.0f, 0.0f} }  },
+		{ /* t*/ { {                0.0f, -sqrtf( 3.0f ) * 0.25f * triangleSize} }, /*G*/{ {0.0f, 1.0f, 0.0f} }  },
+		{ /*lb*/ { {-0.5f * triangleSize,  sqrtf( 3.0f ) * 0.25f * triangleSize} }, /*B*/{ {0.0f, 0.0f, 1.0f} }  }
 	};
 
 	TODO( "Should create path for the case these layers do not exist. At least both are tied to config variables though." )
@@ -464,35 +457,6 @@ catch( ... ){
 // Implementation
 //////////////////////////////////
 
-template< typename Dispatch, typename Element, typename VkComm >
-vector<Element> enumerate( Dispatch dh, VkComm command, const char* commName ){
-	vector<Element> enumerants;
-
-	VkResult errorCode;
-	uint32_t enumerantsCount;
-	do{
-		errorCode = command( dh, &enumerantsCount, nullptr ); RESULT_HANDLER( errorCode, commName );
-
-		enumerants.resize( enumerantsCount );
-		errorCode = command( dh, &enumerantsCount, enumerants.data() );
-	} while( errorCode == VK_INCOMPLETE );
-
-	RESULT_HANDLER( errorCode, commName );
-
-	enumerants.resize( enumerantsCount ); // if enumerantsCount1 > enumerantsCount2
-
-	return enumerants;
-}
-
-
-template< typename Dispatch, typename Element, typename Source, typename VkComm >
-vector<Element> enumerate( Dispatch dh, Source source, VkComm command, const char* commName ){
-	auto bc = std::bind( command, std::placeholders::_1, source, std::placeholders::_2, std::placeholders::_3 );
-
-	return enumerate< Dispatch, Element, decltype(bc) >( dh, bc, commName );
-}
-
-
 VkInstance initInstance( const vector<const char*> layers, const vector<const char*> extensions ){
 	VkApplicationInfo appInfo = {};
 	appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
@@ -541,9 +505,9 @@ void killInstance( VkInstance instance ){
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 vector<VkPhysicalDevice> getPhysicalDevices( VkInstance instance ){
-	return enumerate< VkInstance, VkPhysicalDevice, decltype(vkEnumeratePhysicalDevices) >(
-		instance,
+	return enumerate(
 		vkEnumeratePhysicalDevices,
+		instance,
 		"vkEnumeratePhysicalDevices"
 	);
 }
@@ -846,10 +810,10 @@ void killSurface( VkInstance instance, VkSurfaceKHR surface ){
 }
 
 vector<VkSurfaceFormatKHR> getSurfaceFormats( VkPhysicalDevice physicalDevice, VkSurfaceKHR surface ){
-	return enumerate< VkPhysicalDevice, VkSurfaceFormatKHR, VkSurfaceKHR, decltype(vkGetPhysicalDeviceSurfaceFormatsKHR) >(
+	return enumerate(
+		vkGetPhysicalDeviceSurfaceFormatsKHR,
 		physicalDevice,
 		surface,
-		vkGetPhysicalDeviceSurfaceFormatsKHR,
 		"vkGetPhysicalDeviceSurfaceFormatsKHR"
 	);
 }
@@ -893,10 +857,10 @@ VkSurfaceCapabilitiesKHR getSurfaceCapabilities( VkPhysicalDevice physicalDevice
 }
 
 vector<VkPresentModeKHR> getSurfacePresentModes( VkPhysicalDevice physicalDevice, VkSurfaceKHR surface ){
-		return enumerate< VkPhysicalDevice, VkPresentModeKHR, VkSurfaceKHR, decltype(vkGetPhysicalDeviceSurfacePresentModesKHR) >(
+		return enumerate(
+			vkGetPhysicalDeviceSurfacePresentModesKHR,
 			physicalDevice,
 			surface,
-			vkGetPhysicalDeviceSurfacePresentModesKHR,
 			"vkGetPhysicalDeviceSurfacePresentModesKHR"
 		);
 }
@@ -990,10 +954,10 @@ void killSwapchain( VkDevice device, VkSwapchainKHR swapchain ){
 }
 
 vector<VkImage> getSwapchainImages( VkDevice device, VkSwapchainKHR swapchain ){
-	return enumerate< VkDevice, VkImage, VkSwapchainKHR, decltype(vkGetSwapchainImagesKHR) >(
+	return enumerate(
+		vkGetSwapchainImagesKHR,
 		device,
 		swapchain,
-		vkGetSwapchainImagesKHR,
 		"vkGetSwapchainImagesKHR"
 	);
 }
