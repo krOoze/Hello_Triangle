@@ -17,6 +17,7 @@ using std::endl;
 #include <vector>
 using std::vector;
 
+#include<cstring>
 #include <string>
 using std::string;
 
@@ -26,13 +27,8 @@ using std::exception;
 #include <stdexcept>
 using std::runtime_error;
 
-#include<cstring>
-
 #include <fstream>
-using std::ifstream;
-
 #include <iterator>
-using std::istreambuf_iterator;
 
 #include <cmath>
 #include <algorithm>
@@ -96,6 +92,10 @@ const char* fragmentShaderFilename = "triangle.frag.spv";
 
 // needed stuff -- forward declarations
 ///////////////////////////////
+
+vector<const char*> compileLayerList( const vector<const char*>& optionalLayers );
+bool checkInstanceExtensionSupport( const vector<const char*>& extensions, const vector<const char*>& providingLayers );
+bool checkDeviceExtensionSupport( VkPhysicalDevice physicalDevice, const vector<const char*>& extensions, const vector<const char*>& providingLayers );
 
 VkInstance initInstance( const vector<const char*> layers = {}, const vector<const char*> extensions = {} );
 void killInstance( VkInstance instance );
@@ -242,14 +242,16 @@ int main() try{
 		{ /*lb*/ { {-0.5f * triangleSize,  sqrtf( 3.0f ) * 0.25f * triangleSize} }, /*B*/{ {0.0f, 0.0f, 1.0f} }  }
 	};
 
-	TODO( "Should create path for the case these layers do not exist. At least both are tied to config variables though." )
 	vector<const char*> layers;
 	if( ::debugVulkan ) layers.push_back( "VK_LAYER_LUNARG_standard_validation" );
 	if( ::fpsCounter ) layers.push_back( "VK_LAYER_LUNARG_monitor" );
+	layers = compileLayerList( layers );
+
 
 	auto platformSurfaceExtension = getPlatformSurfaceExtensionName();
 	vector<const char*> instanceExtensions = { VK_KHR_SURFACE_EXTENSION_NAME, platformSurfaceExtension.c_str() };
 	if( ::debugVulkan ) instanceExtensions.push_back( VK_EXT_DEBUG_REPORT_EXTENSION_NAME );
+	checkInstanceExtensionSupport( instanceExtensions, layers );
 
 	VkInstance instance = initInstance(
 		layers,
@@ -266,13 +268,18 @@ int main() try{
 	VkPhysicalDeviceProperties physicalDeviceProperties = getPhysicalDeviceProperties( physicalDevice );
 	VkPhysicalDeviceMemoryProperties physicalDeviceMemoryProperties = getPhysicalDeviceMemoryProperties( physicalDevice );
 	uint32_t queueFamily = getQueueFamily( physicalDevice, surface );
+
+	vector<const char*> deviceExtensions = { VK_KHR_SWAPCHAIN_EXTENSION_NAME };
+	checkDeviceExtensionSupport( physicalDevice, deviceExtensions, layers );
+
 	VkDevice device = initDevice(
 		physicalDevice,
 		features,
 		queueFamily,
 		layers,
-		{VK_KHR_SWAPCHAIN_EXTENSION_NAME}
+		deviceExtensions
 	);
+
 	VkQueue queue = getQueue( device, queueFamily, 0 );
 
 	VkSurfaceFormatKHR surfaceFormat = getSurfaceFormat( physicalDevice, surface );
@@ -457,6 +464,77 @@ catch( ... ){
 // Implementation
 //////////////////////////////////
 
+vector<const char*> compileLayerList( const vector<const char*>& optionalLayers ){
+	vector<const char*> compiledLayerList;
+
+	auto supportedLayers = enumerate( vkEnumerateInstanceLayerProperties, "vkEnumerateInstanceLayerProperties" );
+
+	for( auto optLayer : optionalLayers ){
+		auto supportedCond = [optLayer]( const VkLayerProperties& prop ) -> bool{
+			return std::strcmp( optLayer, prop.layerName ) == 0;
+		};
+
+		bool isSupported = std::any_of( supportedLayers.begin(), supportedLayers.end(), supportedCond );
+
+		if( isSupported ) compiledLayerList.push_back( optLayer );
+		else cout << "WARNING: Requested " << optLayer << " layer is not supported. It will not be enabled." << endl;
+	}
+
+	return compiledLayerList;
+}
+
+bool checkInstanceExtensionSupport( const vector<const char*>& extensions, const vector<const char*>& providingLayers ){
+	auto supportedExtensions = enumerate( vkEnumerateInstanceExtensionProperties, nullptr, "vkEnumerateInstanceExtensionProperties" );
+
+	for( auto pl : providingLayers ){
+		auto providedExtensions = enumerate( vkEnumerateInstanceExtensionProperties, pl, "vkEnumerateInstanceExtensionProperties" );
+		supportedExtensions.insert( supportedExtensions.end(), providedExtensions.begin(), providedExtensions.end() );
+	}
+
+	bool allSupported = true;
+
+	for( auto extension : extensions ){
+		auto supportedCond = [extension]( const VkExtensionProperties& prop ) -> bool{
+			return std::strcmp( extension, prop.extensionName ) == 0;
+		};
+
+		bool isSupported = std::any_of( supportedExtensions.begin(), supportedExtensions.end(), supportedCond );
+		allSupported = allSupported && isSupported;
+
+		if( !isSupported ){
+			cout << "WARNING: Requested " << extension << " instance extension is not supported. Using this in vkCreateInstance will likely fail." << endl;
+		}
+	}
+
+	return allSupported;
+}
+
+bool checkDeviceExtensionSupport( VkPhysicalDevice physicalDevice, const vector<const char*>& extensions, const vector<const char*>& providingLayers ){
+	auto supportedExtensions = enumerate( vkEnumerateDeviceExtensionProperties, physicalDevice, nullptr, "vkEnumerateDeviceExtensionProperties" );
+
+	for( auto pl : providingLayers ){
+		auto providedExtensions = enumerate( vkEnumerateDeviceExtensionProperties, physicalDevice, pl, "vkEnumerateDeviceExtensionProperties" );
+		supportedExtensions.insert( supportedExtensions.end(), providedExtensions.begin(), providedExtensions.end() );
+	}
+
+	bool allSupported = true;
+
+	for( auto extension : extensions ){
+		auto supportedCond = [extension]( const VkExtensionProperties& prop ) -> bool{
+			return std::strcmp( extension, prop.extensionName ) == 0;
+		};
+
+		bool isSupported = std::any_of( supportedExtensions.begin(), supportedExtensions.end(), supportedCond );
+		allSupported = allSupported && isSupported;
+
+		if( !isSupported ){
+			cout << "WARNING: Requested " << extension << " device extension is not supported. Using this in vkCreateDevice will likely fail." << endl;
+		}
+	}
+
+	return allSupported;
+}
+
 VkInstance initInstance( const vector<const char*> layers, const vector<const char*> extensions ){
 	VkApplicationInfo appInfo = {};
 	appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
@@ -492,8 +570,6 @@ VkInstance initInstance( const vector<const char*> layers, const vector<const ch
 
 	VkInstance instance;
 	VkResult errorCode = vkCreateInstance( &instanceInfo, nullptr, &instance ); RESULT_HANDLER( errorCode, "vkCreateInstance" );
-
-	TODO( "On layer and extension failure should enumerate them and give useful error message" )
 
 	return instance;
 }
@@ -1107,6 +1183,9 @@ void killFramebuffers( VkDevice device, vector<VkFramebuffer> framebuffers ){
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 VkShaderModule initShaderModule( VkDevice device, string filename ){
+	using std::ifstream;
+	using std::istreambuf_iterator;
+
 	//using Fs = basic_ifstream<uint32_t>;
 	using Fs = ifstream;
 	Fs ifs( filename, Fs::in | Fs::binary );

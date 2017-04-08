@@ -16,12 +16,13 @@
 #include "FunctionTraits.h"
 
 
-// scheme for Vulkan style enumerations
+// scheme for all Vulkan style enumerations
+// count + array of Elements are the common parameters for all the kinds of Vulkan enumeration comands
 //
-// e.g. for vkEnumeratePhysicalDevices( VkInstance, uint32_t*, VkPhysicalDevice* );
-// This code snippet below is the repetitive part of using all vkEnumerate* commands
-// and count + array of Elements are the common parameters
-// note: there are no real Vulkan commands with only 2 parameters though
+// it can be used directly with command taking two parameters [count, out array]
+// e.g. for vkEnumerateInstanceLayerProperties( uint32_t*, VkLayerProperties* )
+// vkEnumerateInstanceLayerProperties being the Cmd cmd
+// usage: vector<VkLayerProperties> lps = enumerate( vkEnumerateInstanceLayerProperties, "vkEnumerateInstanceLayerProperties" );
 template< typename Cmd >
 decltype(auto) enumerate( Cmd cmd, const char* cmdName ){
 	using Element = std::remove_pointer_t<  function_param_t< Cmd, 1 >  >; // i.e. the 2nd parameter type of the cmd (dereferenced)
@@ -49,20 +50,25 @@ decltype(auto) enumerate( Cmd cmd, const char* cmdName ){
 
 
 // scheme adaptor for 3 parameter Vulkan enumerations [dispatch, count, out array]
+// or for global Vulkan enumerations [source, count, out array]
 //
 // e.g. for vkEnumeratePhysicalDevices( VkInstance, uint32_t*, VkPhysicalDevice* );
 // vkEnumeratePhysicalDevices being the Cmd cmd, and the instance being the Dispatch d
 // usage: vector<VkPhysicalDevice> pds = enumerate( vkEnumeratePhysicalDevices, instance, "vkEnumeratePhysicalDevices" );
+// or
+// e.g. for vkEnumerateInstanceExtensionProperties( const char*, uint32_t*, VkExtensionProperties* );
+// vkEnumerateInstanceExtensionProperties being the Cmd cmd, and the layer name being the Source s
+// usage: vector<VkExtensionProperties> eps = enumerate( vkEnumerateInstanceExtensionProperties, nullptr, "vkEnumerateInstanceExtensionProperties" );
 template<
 	typename Cmd,
-	typename Dispatch
+	typename DispatchOrSource
 >
-decltype(auto) enumerate( Cmd cmd, Dispatch d, const char* cmdName ){
+decltype(auto) enumerate( Cmd cmd, DispatchOrSource dors, const char* cmdName ){
 	using ElementArray = function_param_t< Cmd, 2 >; // i.e. the 3rd parameter type of the cmd
 
 	std::function<  VkResult( uint32_t*, ElementArray )  > adapted_cmd = std::bind(
 		cmd,
-		d,
+		dors,
 		std::placeholders::_1,
 		std::placeholders::_2
 	);
