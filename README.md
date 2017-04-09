@@ -72,6 +72,7 @@ Files
 | EnumerateScheme.h | A scheme to unify usage of all Vulkan `vkEnumerate*` commands |
 | FunctionTraits.h | A template to get type information about functions (to enable EnumerateScheme.h magic) |
 | to_string.h | Workaround for broken Standard C++ library in MinGW |
+| ExtensionLoader.h | Functions handling loading of Vulkan extension commands |
 | triangle.vert | The vertex shader program in GLSL |
 | triangle.frag | The fragment shader program in GLSL |
 | triangle.vert.spv | triangle.vert pre-transcripted to SPIR-V for convenience |

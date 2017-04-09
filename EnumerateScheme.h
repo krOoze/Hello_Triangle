@@ -38,7 +38,7 @@ decltype(auto) enumerate( Cmd cmd, const char* cmdName ){
 
 		enumerants.resize( enumerantsCount );
 		errorCode = cmd( &enumerantsCount, enumerants.data() ); // get current array up to enumerantsCount
-	} while (errorCode == VK_INCOMPLETE);
+	} while( errorCode == VK_INCOMPLETE );
 
 	RESULT_HANDLER( errorCode, cmdName );
 

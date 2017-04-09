@@ -42,6 +42,7 @@ using std::runtime_error;
 #include "ErrorHandling.h"
 #include "Vertex.h"
 #include "EnumerateScheme.h"
+#include "ExtensionLoader.h"
 
 #if defined(USE_PLATFORM_GLFW)
 	#include "glfwPlatform.h"
@@ -61,7 +62,7 @@ using std::runtime_error;
 // layers and debug
 TODO( "Should be also guarded by VK_EXT_debug_report in case of some exotic vulkan.h" )
 #ifdef _DEBUG
-constexpr bool debugVulkan = true;
+bool debugVulkan = true;
 constexpr VkDebugReportFlagsEXT debugAmount =
 	0
 	//|  VK_DEBUG_REPORT_INFORMATION_BIT_EXT
@@ -94,8 +95,10 @@ const char* fragmentShaderFilename = "triangle.frag.spv";
 ///////////////////////////////
 
 vector<const char*> compileLayerList( const vector<const char*>& optionalLayers );
-bool checkInstanceExtensionSupport( const vector<const char*>& extensions, const vector<const char*>& providingLayers );
-bool checkDeviceExtensionSupport( VkPhysicalDevice physicalDevice, const vector<const char*>& extensions, const vector<const char*>& providingLayers );
+vector<VkExtensionProperties> getSupportedInstanceExtensions( const vector<const char*>& providingLayers );
+vector<VkExtensionProperties> getSupportedDeviceExtensions( VkPhysicalDevice physDevice, const vector<const char*>& providingLayers );
+bool isExtensionSupported( const char* extension, const vector<VkExtensionProperties>& supportedExtensions );
+bool checkExtensionSupport( const vector<const char*>& extensions, const vector<VkExtensionProperties>& supportedExtensions );
 
 VkInstance initInstance( const vector<const char*> layers = {}, const vector<const char*> extensions = {} );
 void killInstance( VkInstance instance );
@@ -247,16 +250,17 @@ int main() try{
 	if( ::fpsCounter ) layers.push_back( "VK_LAYER_LUNARG_monitor" );
 	layers = compileLayerList( layers );
 
-
+	auto supportedInstanceExtensions = getSupportedInstanceExtensions( layers );
 	auto platformSurfaceExtension = getPlatformSurfaceExtensionName();
 	vector<const char*> instanceExtensions = { VK_KHR_SURFACE_EXTENSION_NAME, platformSurfaceExtension.c_str() };
+	if(  ::debugVulkan && !isExtensionSupported( VK_EXT_DEBUG_REPORT_EXTENSION_NAME, supportedInstanceExtensions )  ){
+		cout << "WARNING: Requested " << VK_EXT_DEBUG_REPORT_EXTENSION_NAME << " extension is not supported. It will not be enabled." << endl;
+		::debugVulkan = false;
+	}
 	if( ::debugVulkan ) instanceExtensions.push_back( VK_EXT_DEBUG_REPORT_EXTENSION_NAME );
-	checkInstanceExtensionSupport( instanceExtensions, layers );
+	checkExtensionSupport( instanceExtensions, supportedInstanceExtensions );
 
-	VkInstance instance = initInstance(
-		layers,
-		instanceExtensions
-	);
+	VkInstance instance = initInstance( layers, instanceExtensions );
 
 	VkDebugReportCallbackEXT debug = ::debugVulkan ? initDebug( instance, ::debugAmount ) : VK_NULL_HANDLE;
 
@@ -269,8 +273,9 @@ int main() try{
 	VkPhysicalDeviceMemoryProperties physicalDeviceMemoryProperties = getPhysicalDeviceMemoryProperties( physicalDevice );
 	uint32_t queueFamily = getQueueFamily( physicalDevice, surface );
 
+	auto supportedDeviceExtensions = getSupportedDeviceExtensions( physicalDevice, layers );
 	vector<const char*> deviceExtensions = { VK_KHR_SWAPCHAIN_EXTENSION_NAME };
-	checkDeviceExtensionSupport( physicalDevice, deviceExtensions, layers );
+	checkExtensionSupport( deviceExtensions, supportedDeviceExtensions );
 
 	VkDevice device = initDevice(
 		physicalDevice,
@@ -483,80 +488,72 @@ vector<const char*> compileLayerList( const vector<const char*>& optionalLayers 
 	return compiledLayerList;
 }
 
-bool checkInstanceExtensionSupport( const vector<const char*>& extensions, const vector<const char*>& providingLayers ){
+vector<VkExtensionProperties> getSupportedInstanceExtensions( const vector<const char*>& providingLayers ){
 	auto supportedExtensions = enumerate( vkEnumerateInstanceExtensionProperties, nullptr, "vkEnumerateInstanceExtensionProperties" );
 
-	for( auto pl : providingLayers ){
+	for( const auto pl : providingLayers ){
 		auto providedExtensions = enumerate( vkEnumerateInstanceExtensionProperties, pl, "vkEnumerateInstanceExtensionProperties" );
 		supportedExtensions.insert( supportedExtensions.end(), providedExtensions.begin(), providedExtensions.end() );
 	}
 
-	bool allSupported = true;
-
-	for( auto extension : extensions ){
-		auto supportedCond = [extension]( const VkExtensionProperties& prop ) -> bool{
-			return std::strcmp( extension, prop.extensionName ) == 0;
-		};
-
-		bool isSupported = std::any_of( supportedExtensions.begin(), supportedExtensions.end(), supportedCond );
-		allSupported = allSupported && isSupported;
-
-		if( !isSupported ){
-			cout << "WARNING: Requested " << extension << " instance extension is not supported. Using this in vkCreateInstance will likely fail." << endl;
-		}
-	}
-
-	return allSupported;
+	return supportedExtensions;
 }
 
-bool checkDeviceExtensionSupport( VkPhysicalDevice physicalDevice, const vector<const char*>& extensions, const vector<const char*>& providingLayers ){
-	auto supportedExtensions = enumerate( vkEnumerateDeviceExtensionProperties, physicalDevice, nullptr, "vkEnumerateDeviceExtensionProperties" );
+vector<VkExtensionProperties> getSupportedDeviceExtensions( VkPhysicalDevice physDevice, const vector<const char*>& providingLayers ){
+	auto supportedExtensions = enumerate( vkEnumerateDeviceExtensionProperties, physDevice, nullptr, "vkEnumerateDeviceExtensionProperties" );
 
 	for( auto pl : providingLayers ){
-		auto providedExtensions = enumerate( vkEnumerateDeviceExtensionProperties, physicalDevice, pl, "vkEnumerateDeviceExtensionProperties" );
+		auto providedExtensions = enumerate( vkEnumerateDeviceExtensionProperties, physDevice, pl, "vkEnumerateDeviceExtensionProperties" );
 		supportedExtensions.insert( supportedExtensions.end(), providedExtensions.begin(), providedExtensions.end() );
 	}
 
+	return supportedExtensions;
+}
+
+bool isExtensionSupported( const char* extension, const vector<VkExtensionProperties>& supportedExtensions ){
+	auto supportedCond = [extension]( const VkExtensionProperties& prop ) -> bool{
+		return std::strcmp( extension, prop.extensionName ) == 0;
+	};
+
+	return std::any_of( supportedExtensions.begin(), supportedExtensions.end(), supportedCond );
+}
+
+bool checkExtensionSupport( const vector<const char*>& extensions, const vector<VkExtensionProperties>& supportedExtensions ){
 	bool allSupported = true;
 
 	for( auto extension : extensions ){
-		auto supportedCond = [extension]( const VkExtensionProperties& prop ) -> bool{
-			return std::strcmp( extension, prop.extensionName ) == 0;
-		};
-
-		bool isSupported = std::any_of( supportedExtensions.begin(), supportedExtensions.end(), supportedCond );
+		bool isSupported = isExtensionSupported( extension, supportedExtensions );
 		allSupported = allSupported && isSupported;
 
 		if( !isSupported ){
-			cout << "WARNING: Requested " << extension << " device extension is not supported. Using this in vkCreateDevice will likely fail." << endl;
+			cout << "WARNING: Requested " << extension << " extension is not supported. Trying to enable it will likely fail." << endl;
 		}
 	}
 
 	return allSupported;
 }
+
 
 VkInstance initInstance( const vector<const char*> layers, const vector<const char*> extensions ){
 	VkApplicationInfo appInfo = {};
 	appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
-	appInfo.pApplicationName = u8"Hello Vulkan Triangle";
-	appInfo.apiVersion = 0; // 0 should accept any version
-
-	TODO( "Should make a warning if Vulkan version is not the expected 1.0" )
+	appInfo.pApplicationName = u8"Hello Vulkan Triangle"; // Nice to meetcha, and what's your name driver?
+	appInfo.apiVersion = VK_API_VERSION_1_0; // this app is written against Vulkan 1.0 spec
 
 	VkInstanceCreateInfo instanceInfo{
 		VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
 		nullptr, // pNext for extensions use
 		0, // flags - reserved for future use
-		&appInfo, // has to be non-NULL due to a AMD driver bug
-		(uint32_t)layers.size(),
+		&appInfo,
+		static_cast<uint32_t>( layers.size() ),
 		layers.data(),
-		(uint32_t)extensions.size(),
+		static_cast<uint32_t>( extensions.size() ),
 		extensions.data()
 	};
 
 
 	VkDebugReportCallbackCreateInfoEXT debugCreateInfo{
-		VK_STRUCTURE_TYPE_DEBUG_REPORT_CREATE_INFO_EXT,
+		VK_STRUCTURE_TYPE_DEBUG_REPORT_CALLBACK_CREATE_INFO_EXT,
 		nullptr,
 		::debugAmount,
 		genericDebugCallback,
@@ -571,10 +568,14 @@ VkInstance initInstance( const vector<const char*> layers, const vector<const ch
 	VkInstance instance;
 	VkResult errorCode = vkCreateInstance( &instanceInfo, nullptr, &instance ); RESULT_HANDLER( errorCode, "vkCreateInstance" );
 
+	loadInstanceExtensionsCommands( instance, extensions );
+
 	return instance;
 }
 
 void killInstance( VkInstance instance ){
+	unloadInstanceExtensionsCommands( instance );
+
 	vkDestroyInstance( instance, nullptr );
 }
 
@@ -686,10 +687,14 @@ VkDevice initDevice(
 	VkDevice device;
 	VkResult errorCode = vkCreateDevice( physDevice, &deviceInfo, nullptr, &device ); RESULT_HANDLER( errorCode, "vkCreateDevice" );
 
+	loadDeviceExtensionsCommands( device, extensions );
+
 	return device;
 }
 
 void killDevice( VkDevice device ){
+	unloadDeviceExtensionsCommands( device );
+
 	vkDestroyDevice( device, nullptr );
 }
 
@@ -859,13 +864,11 @@ VkImageView initImageView( VkDevice device, VkImage image, VkFormat format ){
 		{
 			VK_IMAGE_ASPECT_COLOR_BIT,
 			/* base mip-level */ 0,
-			/* level count */ 1, //VK_REMAINING_MIP_LEVELS,
+			/* level count */ VK_REMAINING_MIP_LEVELS,
 			/* base array layer */ 0,
-			/* array layer count */ 1 //VK_REMAINING_ARRAY_LAYERS
+			/* array layer count */ VK_REMAINING_ARRAY_LAYERS
 		}
 	};
-
-	TODO( "Workaround for bad layers mishandling VK_REMAINING_*" )
 
 	VkImageView imageView;
 	VkResult errorCode = vkCreateImageView( device, &iciv, nullptr, &imageView ); RESULT_HANDLER( errorCode, "vkCreateImageView" );
