@@ -12,9 +12,7 @@
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 
-
 #include "to_string.h"
-
 #include "CompilerMessages.h"
 
 
@@ -37,6 +35,7 @@ void setSizeEventHandler( std::function<void(void)> newSizeEventHandler );
 void setPaintEventHandler( std::function<void(void)> newPaintEventHandler );
 
 void showWindow( PlatformWindow window );
+
 
 // Implementation
 //////////////////////////////////
@@ -65,50 +64,58 @@ struct GlfwError{
 std::queue<GlfwError> errors;
 
 void glfwErrorCallback( int error, const char* description ){
-	errors.push( {error, description} );
+	errors.push( {error, description} ); // postpone errors because I don't want to throw into C API
 }
 
-void myInitGlfw(){
-	glfwSetErrorCallback( glfwErrorCallback );
 
-	auto success = glfwInit();
-	if( !success ) throw "Trouble initializing GLFW!";
+// just make the global glfw instialization\destruction static
+class GlfwSingleton{
+	static const GlfwSingleton glfwInstance;
 
-	if( !glfwVulkanSupported() ) throw "GLFW has trouble acquiring Vulkan support";
-}
+	void destroyGlfw() noexcept{
+		glfwTerminate();
+		glfwSetErrorCallback( nullptr );
+	}
+
+	~GlfwSingleton(){
+		this->destroyGlfw();
+	}
+
+	GlfwSingleton(){
+		glfwSetErrorCallback( glfwErrorCallback );
+
+		const auto success = glfwInit();
+		if( !success ){
+			glfwSetErrorCallback( nullptr );
+			throw "Trouble initializing GLFW!";
+		}
+
+		if( !glfwVulkanSupported() ){
+			this->destroyGlfw();
+			throw "GLFW has trouble acquiring Vulkan support!";
+		}
+	}
+};
+const GlfwSingleton GlfwSingleton::glfwInstance;
 
 void showWindow( PlatformWindow window ){
 	glfwShowWindow( window.window );
 	sizeEventHandler();
 }
 
-bool endsWith( const std::string& what, const std::string& ending ){
-	if( ending.size() > what.size() ) return false;
-
-	return std::equal( ending.rbegin(), ending.rend(), what.rbegin() );
-}
-
 std::string getPlatformSurfaceExtensionName(){
-	TODO( "Leaks GLFW if killWindow never called." )
-	myInitGlfw();
-
 	uint32_t count;
-	const char** extensions = glfwGetRequiredInstanceExtensions( &count );
+	const char** extensions = glfwGetRequiredInstanceExtensions( &count ); // GLFW owns **extensions!!!
 
-	if( !count || !extensions ) throw "GLFW failed to return required extensions!";
+	if( !count || !extensions ) throw "GLFW failed to return required Vulkan extensions!";
 
-	if( count != 2 )  throw "GLFW returned unexpected number of required extensions!";
+	if( count != 2 ) throw "GLFW returned unexpected number of required Vulkan extensions!";
 
-	const std::string surfaceE = "VK_KHR_surface";
-	if( extensions[0] == surfaceE ){
-		if(  endsWith( extensions[1], "_surface" )  ) return extensions[1];
-		else throw "Unexpected GLFW required instance extensions!";
-	}
-	else if( extensions[1] == surfaceE ){
-		if(  endsWith( extensions[0], "_surface" )  ) return extensions[0];
-		else throw "Unexpected GLFW required instance extensions!";
-	}
-	else throw "Unexpected GLFW required instance extensions!";
+	if(  extensions[0] != string( VK_KHR_SURFACE_EXTENSION_NAME )  ) throw VK_KHR_SURFACE_EXTENSION_NAME " is not a 1st required GLFW extension!";
+
+	string surfaceExtension = string( extensions[1] );
+
+	return string( extensions[1] );
 }
 
 GLFWmonitor* getCurrentMonitor( GLFWwindow* window ){
@@ -184,13 +191,13 @@ void keyCallback( GLFWwindow* window, int key, int /*scancode*/, int action, int
 
 int messageLoop( PlatformWindow window ){
 
-	while(  !glfwWindowShouldClose( window.window )  ){
-		if( !errors.empty() ) throw to_string( errors.front().error ) + ": " + errors.front().description;
-
+	while(  errors.empty() && !glfwWindowShouldClose( window.window )  ){
 		paintEventHandler(); // repaint always
 
 		glfwPollEvents();
 	}
+
+	if( !errors.empty() ) throw to_string( errors.size() ) + " GLFW error(s) on backlog; 1st error: " + to_string( errors.front().error ) + ": " + errors.front().description;
 
 	return EXIT_SUCCESS;
 }
@@ -200,9 +207,7 @@ bool platformPresentationSupport( VkInstance instance, VkPhysicalDevice device, 
 	return glfwGetPhysicalDevicePresentationSupport( instance, device, queueFamilyIndex ) == GLFW_TRUE;
 }
 
-PlatformWindow initWindow( int canvasWidth, int canvasHeight ){
-	myInitGlfw();
-
+PlatformWindow initWindow( const int canvasWidth, const int canvasHeight ){
 	glfwWindowHint( GLFW_CLIENT_API, GLFW_NO_API );
 	glfwWindowHint( GLFW_VISIBLE, GLFW_FALSE );
 	GLFWwindow* window = glfwCreateWindow( canvasWidth, canvasHeight, "Hello Vulkan Triangle", NULL, NULL );
@@ -220,12 +225,11 @@ PlatformWindow initWindow( int canvasWidth, int canvasHeight ){
 
 void killWindow( PlatformWindow window ){
 	glfwDestroyWindow( window.window );
-	glfwTerminate();
 }
 
-VkSurfaceKHR initSurface( VkInstance instance, PlatformWindow window ){
+VkSurfaceKHR initSurface( const VkInstance instance, const PlatformWindow window ){
 	VkSurfaceKHR surface;
-	VkResult errorCode = glfwCreateWindowSurface( instance, window.window, nullptr, &surface ); RESULT_HANDLER( errorCode, "glfwCreateWindowSurface" );
+	const VkResult errorCode = glfwCreateWindowSurface( instance, window.window, nullptr, &surface ); RESULT_HANDLER( errorCode, "glfwCreateWindowSurface" );
 
 	return surface;
 }

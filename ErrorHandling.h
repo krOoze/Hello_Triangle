@@ -5,6 +5,7 @@
 
 #include <iostream>
 #include <string>
+#include <sstream>
 
 #include <vulkan/vulkan.h>
 
@@ -26,6 +27,8 @@ struct VulkanResultException{
 #define RESULT_HANDLER( errorCode, source )  if( errorCode ) throw VulkanResultException( __FILE__, __LINE__, __func__, source, errorCode )
 #define RESULT_HANDLER_EX( cond, errorCode, source )  if( cond ) throw VulkanResultException( __FILE__, __LINE__, __func__, source, errorCode )
 
+// just use cout for logging now
+std::ostream& logger = std::cout;
 
 VKAPI_ATTR VkBool32 VKAPI_CALL genericDebugCallback(
 	VkDebugReportFlagsEXT msgFlags,
@@ -38,13 +41,13 @@ VKAPI_ATTR VkBool32 VKAPI_CALL genericDebugCallback(
 	void* /*pUserData*/
 );
 
-// from vulkan.h
-//vkCreateDebugReportCallbackEXT();
-//vkDestroyDebugReportCallbackEXT();
-//vkDebugReportMessageEXT();
-
 VkDebugReportCallbackEXT initDebug( VkInstance instance, const VkDebugReportFlagsEXT debugAmount );
 void killDebug( VkInstance instance, VkDebugReportCallbackEXT debug );
+
+
+template <typename PHANDLE_T>
+inline uint64_t handleToUint64(const PHANDLE_T *h) { return reinterpret_cast<uint64_t>(h); }
+inline uint64_t handleToUint64(const uint64_t h) { return h; }
 
 // Implementation
 //////////////////////////////////
@@ -163,6 +166,12 @@ string d_to_string( VkDebugReportFlagsEXT msgFlags ){
 	return res;
 }
 
+string to_string_hex( const uint64_t n ){
+	std::stringstream ss;
+	ss << std::hex << std::noshowbase << std::uppercase << n;
+	return "0x" + ss.str();
+}
+
 VKAPI_ATTR VkBool32 VKAPI_CALL genericDebugCallback(
 	VkDebugReportFlagsEXT flags,
 	VkDebugReportObjectTypeEXT objectType,
@@ -173,41 +182,41 @@ VKAPI_ATTR VkBool32 VKAPI_CALL genericDebugCallback(
 	const char* pMessage,
 	void* /*pUserData*/
 ){
-	using std::cout;
 	using std::endl;
+	using std::to_string;
 
-	string report = d_to_string( flags ) + ": " + to_string( objectType ) + to_string( object ) + ": " + to_string( messageCode ) + ", " + pLayerPrefix + ", " + pMessage;
+	const std::string report = d_to_string( flags ) + ": " + to_string( objectType ) + "(" + to_string_hex( object ) + ")" + ": " + to_string( messageCode ) + ", " + pLayerPrefix + ", " + pMessage;
 
 	if( (flags & VK_DEBUG_REPORT_ERROR_BIT_EXT) || (flags & VK_DEBUG_REPORT_WARNING_BIT_EXT) || (flags & VK_DEBUG_REPORT_PERFORMANCE_WARNING_BIT_EXT) ){
-			cout << "\n!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n";
-			cout << report;
-			cout << "\n!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n";
-			cout << endl;
+			logger << "\n!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n";
+			logger << report;
+			logger << "\n!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n";
+			logger << endl;
 	}
 	else{
-		cout << report << endl;
+		logger << report << endl;
 	}
 
 	return VK_FALSE; // no abort on misbehaving command
 }
 
 
-VkDebugReportCallbackEXT initDebug( VkInstance instance, const VkDebugReportFlagsEXT debugAmount ){
-	VkDebugReportCallbackCreateInfoEXT debugCreateInfo{
+VkDebugReportCallbackEXT initDebug( const VkInstance instance, const VkDebugReportFlagsEXT debugAmount ){
+	const VkDebugReportCallbackCreateInfoEXT debugCreateInfo{
 		VK_STRUCTURE_TYPE_DEBUG_REPORT_CALLBACK_CREATE_INFO_EXT,
-		nullptr,
+		nullptr, // pNext
 		debugAmount,
-		genericDebugCallback,
-		nullptr
+		::genericDebugCallback,
+		nullptr // pUserData
 	};
 
 	VkDebugReportCallbackEXT debug;
-	VkResult errorCode = vkCreateDebugReportCallbackEXT( instance, &debugCreateInfo, nullptr, &debug ); RESULT_HANDLER( errorCode, "vkCreateDebugReportCallbackEXT" );
+	const VkResult errorCode = vkCreateDebugReportCallbackEXT( instance, &debugCreateInfo, nullptr, &debug ); RESULT_HANDLER( errorCode, "vkCreateDebugReportCallbackEXT" );
 
 	return debug;
 }
 
-void killDebug( VkInstance instance, VkDebugReportCallbackEXT debug ){
+void killDebug( const VkInstance instance, const VkDebugReportCallbackEXT debug ){
 	vkDestroyDebugReportCallbackEXT( instance, debug, nullptr );
 }
 

@@ -4,19 +4,17 @@
 #define EXTENSION_LOADER_H
 
 #include <vector>
-using std::vector;
 
 #include <unordered_map>
-using std::unordered_map;
 
 #include<cstring>
 
 #include <vulkan/vulkan.h>
 
-void loadInstanceExtensionsCommands( VkInstance instance, vector<const char*> instanceExtensions );
+void loadInstanceExtensionsCommands( VkInstance instance, const std::vector<const char*>& instanceExtensions );
 void unloadInstanceExtensionsCommands( VkInstance instance );
 
-void loadDeviceExtensionsCommands( VkDevice device, vector<const char*> instanceExtensions );
+void loadDeviceExtensionsCommands( VkDevice device, const std::vector<const char*>& instanceExtensions );
 void unloadDeviceExtensionsCommands( VkDevice device );
 
 void loadDebugReportCommands( VkInstance instance );
@@ -25,9 +23,9 @@ void unloadDebugReportCommands( VkInstance instance );
 
 ////////////////////////////////////////////////////////
 
-unordered_map< VkInstance, vector<const char*> > instanceExtensionsMap;
+std::unordered_map< VkInstance, std::vector<const char*> > instanceExtensionsMap;
 
-void loadInstanceExtensionsCommands( VkInstance instance, vector<const char*> instanceExtensions ){
+void loadInstanceExtensionsCommands( const VkInstance instance, const std::vector<const char*>& instanceExtensions ){
 	using std::strcmp;
 
 	instanceExtensionsMap[instance] = instanceExtensions;
@@ -38,7 +36,7 @@ void loadInstanceExtensionsCommands( VkInstance instance, vector<const char*> in
 	}
 }
 
-void unloadInstanceExtensionsCommands( VkInstance instance ){
+void unloadInstanceExtensionsCommands( const VkInstance instance ){
 	using std::strcmp;
 
 	for(  const auto e : instanceExtensionsMap.at( instance )  ){
@@ -49,9 +47,9 @@ void unloadInstanceExtensionsCommands( VkInstance instance ){
 	instanceExtensionsMap.erase( instance );
 }
 
-unordered_map< VkDevice, vector<const char*> > deviceExtensionsMap;
+std::unordered_map< VkDevice, std::vector<const char*> > deviceExtensionsMap;
 
-void loadDeviceExtensionsCommands( VkDevice device, vector<const char*> deviceExtensions ){
+void loadDeviceExtensionsCommands( const VkDevice device, const std::vector<const char*>& deviceExtensions ){
 	using std::strcmp;
 
 	deviceExtensionsMap[device] = deviceExtensions;
@@ -61,7 +59,7 @@ void loadDeviceExtensionsCommands( VkDevice device, vector<const char*> deviceEx
 	//}
 }
 
-void unloadDeviceExtensionsCommands( VkDevice device ){
+void unloadDeviceExtensionsCommands( const VkDevice device ){
 	using std::strcmp;
 
 	//for(  const auto e : deviceExtensionsMap.at( device )  ){
@@ -74,23 +72,23 @@ void unloadDeviceExtensionsCommands( VkDevice device ){
 // VK_EXT_debug_report
 //////////////////////////////////
 
-unordered_map< VkInstance, PFN_vkCreateDebugReportCallbackEXT > CreateDebugReportCallbackEXTDispatchTable;
-unordered_map< VkInstance, PFN_vkDestroyDebugReportCallbackEXT > DestroyDebugReportCallbackEXTDispatchTable;
-unordered_map< VkInstance, PFN_vkDebugReportMessageEXT > DebugReportMessageEXTDispatchTable;
+std::unordered_map< VkInstance, PFN_vkCreateDebugReportCallbackEXT > CreateDebugReportCallbackEXTDispatchTable;
+std::unordered_map< VkInstance, PFN_vkDestroyDebugReportCallbackEXT > DestroyDebugReportCallbackEXTDispatchTable;
+std::unordered_map< VkInstance, PFN_vkDebugReportMessageEXT > DebugReportMessageEXTDispatchTable;
 
 void loadDebugReportCommands( VkInstance instance ){
 	PFN_vkVoidFunction temp_fp;
 
 	temp_fp = vkGetInstanceProcAddr( instance, "vkCreateDebugReportCallbackEXT" );
-	if( !temp_fp ) throw "Failed to load vkCreateDebugReportCallbackEXT";
+	if( !temp_fp ) throw "Failed to load vkCreateDebugReportCallbackEXT"; // check shouldn't be necessary (based on spec)
 	CreateDebugReportCallbackEXTDispatchTable[instance] = reinterpret_cast<PFN_vkCreateDebugReportCallbackEXT>( temp_fp );
 
 	temp_fp = vkGetInstanceProcAddr( instance, "vkDestroyDebugReportCallbackEXT" );
-	if( !temp_fp ) throw "Failed to load vkDestroyDebugReportCallbackEXT";
+	if( !temp_fp ) throw "Failed to load vkDestroyDebugReportCallbackEXT"; // check shouldn't be necessary (based on spec)
 	DestroyDebugReportCallbackEXTDispatchTable[instance] = reinterpret_cast<PFN_vkDestroyDebugReportCallbackEXT>( temp_fp );
 
 	temp_fp = vkGetInstanceProcAddr( instance, "vkDebugReportMessageEXT" );
-	if( !temp_fp ) throw "Failed to load vkDebugReportMessageEXT";
+	if( !temp_fp ) throw "Failed to load vkDebugReportMessageEXT"; // check shouldn't be necessary (based on spec)
 	DebugReportMessageEXTDispatchTable[instance] = reinterpret_cast<PFN_vkDebugReportMessageEXT>( temp_fp );
 }
 

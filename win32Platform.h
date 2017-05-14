@@ -96,21 +96,21 @@ LRESULT CALLBACK wndProc( HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam ){
 
 	TODO( "Probably needs to be implemented to allow seamless resizing." )
 	case WM_ERASEBKGND:
-		//cout << "erase\n";
+		//log << "erase\n";
 		return DefWindowProc( hWnd, uMsg, wParam, lParam );
 
 	case WM_NCCALCSIZE:
-		//cout << "nccalcsize " << wParam << " " << lParam << endl;
+		//log << "nccalcsize " << wParam << " " << lParam << endl;
 		return DefWindowProc( hWnd, uMsg, wParam, lParam );
 
 	case WM_SIZE:
-		//cout << "size " << wParam << " " << LOWORD( lParam ) << "x" << HIWORD( lParam ) << endl;
+		//log << "size " << wParam << " " << LOWORD( lParam ) << "x" << HIWORD( lParam ) << endl;
 		sizeEventHandler();
 		return 0;
 
 	case WM_PAINT: // sent after WM_SIZE -- react to this immediately to resize seamlessly
 		//ValidateRect( hWnd, NULL ); // never validate so window always gets redrawn
-		//cout << "paint\n";
+		//log << "paint\n";
 		paintEventHandler();
 		return 0;
 
@@ -123,7 +123,7 @@ LRESULT CALLBACK wndProc( HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam ){
 		return 0;
 
 	default:
-		//cout << "unknown " << to_string( uMsg ) << endl;
+		//log << "unknown " << to_string( uMsg ) << endl;
 		return DefWindowProc( hWnd, uMsg, wParam, lParam );
 	}
 }

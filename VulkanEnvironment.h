@@ -7,10 +7,21 @@
 
 // detect premature vulkan.h
 #ifdef VULKAN_H_
-	#error Some vulkan.h is already included before this file!
+	#error "vulkan.h is included before VulkanEnvironment.h!"
 #endif //VULKAN_H_
 
 #include "CompilerMessages.h"
+
+
+#ifdef NDEBUG
+	#ifndef VULKAN_VALIDATION
+		#define VULKAN_VALIDATION 0
+	#endif
+#else
+	#ifndef VULKAN_VALIDATION
+		#define VULKAN_VALIDATION 1
+	#endif
+#endif
 
 // platform specific settings
 
@@ -30,13 +41,9 @@
 	#define USE_PLATFORM_GLFW
 	//#define VK_USE_PLATFORM_XCB_KHR
 #else
-	//#error "Unsupported platform"
+	//#error "Unsupported Vulkan WSI platform." // caught in main.cpp instead
 #endif
 
 TODO( "Add other (all would be awesome) platforms" )
-
-#if defined(_WIN32)
-	#define _CRT_SECURE_NO_WARNINGS
-#endif
 
 #endif //COMMON_VULKAN_ENVIRONMENT_H

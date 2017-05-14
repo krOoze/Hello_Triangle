@@ -2,17 +2,13 @@
 
 
 // Global header settings
-//////////////////////////
+//////////////////////////////////////////////////////////////////////////////////
 
 #include "VulkanEnvironment.h" // first include must be before vulkan.h and platform header
 
 
 // Includes
-//////////////////////////
-
-#include <iostream>
-using std::cout;
-using std::endl;
+//////////////////////////////////////////////////////////////////////////////////
 
 #include <vector>
 using std::vector;
@@ -22,9 +18,8 @@ using std::vector;
 using std::string;
 
 #include <exception>
-using std::exception;
-
 #include <stdexcept>
+using std::exception;
 using std::runtime_error;
 
 #include <fstream>
@@ -36,7 +31,10 @@ using std::runtime_error;
 
 #include <cassert>
 
-#include <vulkan/vulkan.h> // assume core+WSI loaded
+#include <vulkan/vulkan.h> // + assume core+WSI is loaded
+#if VK_HEADER_VERSION < 46
+	#error Update your SDK! This app is written against Vulkan header version 46
+#endif
 
 #include "to_string.h"
 #include "ErrorHandling.h"
@@ -53,27 +51,23 @@ using std::runtime_error;
 #elif defined(VK_USE_PLATFORM_XCB_KHR)
 	#include "xcbPlatform.h"
 #else
-	#error "Unsupported platform (yet)"
+	#error "Unsupported Vulkan WSI platform."
 #endif
 
+
 // Config
-///////////////////////
+//////////////////////////////////////////////////////////////////////////////////
 
 // layers and debug
-TODO( "Should be also guarded by VK_EXT_debug_report in case of some exotic vulkan.h" )
-#ifdef _DEBUG
-bool debugVulkan = true;
-constexpr VkDebugReportFlagsEXT debugAmount =
-	0
-	//|  VK_DEBUG_REPORT_INFORMATION_BIT_EXT
-	| VK_DEBUG_REPORT_WARNING_BIT_EXT
-	| VK_DEBUG_REPORT_PERFORMANCE_WARNING_BIT_EXT
-	| VK_DEBUG_REPORT_ERROR_BIT_EXT
-	//| VK_DEBUG_REPORT_DEBUG_BIT_EXT
-;
-#else
-constexpr bool debugVulkan = false;
-constexpr VkDebugReportFlagsEXT debugAmount = 0;
+#if VULKAN_VALIDATION
+	constexpr VkDebugReportFlagsEXT debugAmount =
+		0
+		//| VK_DEBUG_REPORT_INFORMATION_BIT_EXT
+		| VK_DEBUG_REPORT_WARNING_BIT_EXT
+		| VK_DEBUG_REPORT_PERFORMANCE_WARNING_BIT_EXT
+		| VK_DEBUG_REPORT_ERROR_BIT_EXT
+		//| VK_DEBUG_REPORT_DEBUG_BIT_EXT
+	;
 #endif
 
 constexpr bool fpsCounter = true;
@@ -88,35 +82,31 @@ constexpr VkPresentModeKHR presentMode = VK_PRESENT_MODE_FIFO_KHR;
 // pipeline settings
 constexpr VkClearValue clearColor = {  { {0.1f, 0.1f, 0.1f, 1.0f} }  };
 
-const char* vertexShaderFilename = "triangle.vert.spv";
-const char* fragmentShaderFilename = "triangle.frag.spv";
+constexpr char vertexShaderFilename[] = "triangle.vert.spv";
+constexpr char fragmentShaderFilename[] = "triangle.frag.spv";
 
-// needed stuff -- forward declarations
-///////////////////////////////
 
-vector<const char*> compileLayerList( const vector<const char*>& optionalLayers );
-vector<VkExtensionProperties> getSupportedInstanceExtensions( const vector<const char*>& providingLayers );
-vector<VkExtensionProperties> getSupportedDeviceExtensions( VkPhysicalDevice physDevice, const vector<const char*>& providingLayers );
-bool isExtensionSupported( const char* extension, const vector<VkExtensionProperties>& supportedExtensions );
-bool checkExtensionSupport( const vector<const char*>& extensions, const vector<VkExtensionProperties>& supportedExtensions );
+// needed stuff for main() -- forward declarations
+//////////////////////////////////////////////////////////////////////////////////
 
-VkInstance initInstance( const vector<const char*> layers = {}, const vector<const char*> extensions = {} );
+bool isLayerSupported( const char* layer );
+
+VkInstance initInstance( const vector<const char*>& layers = {}, const vector<const char*>& extensions = {} );
 void killInstance( VkInstance instance );
 
-VkPhysicalDevice getPhysicalDevice( VkInstance instance ); // destroyed with instance
+VkPhysicalDevice getPhysicalDevice( VkInstance instance, VkSurfaceKHR surface = VK_NULL_HANDLE /*seek presentation support if !NULL*/ ); // destroyed with instance
 VkPhysicalDeviceProperties getPhysicalDeviceProperties( VkPhysicalDevice physicalDevice );
 VkPhysicalDeviceMemoryProperties getPhysicalDeviceMemoryProperties( VkPhysicalDevice physicalDevice );
 
-bool getPresentationSupport( VkPhysicalDevice physDevice, uint32_t queueFamily, VkSurfaceKHR surface );
-
 uint32_t getQueueFamily( VkPhysicalDevice physDevice, VkSurfaceKHR surface );
+vector<VkQueueFamilyProperties> getQueueFamilyProperties( VkPhysicalDevice device );
 
 VkDevice initDevice(
 	VkPhysicalDevice physDevice,
 	const VkPhysicalDeviceFeatures& features,
 	uint32_t queueFamilyIndex,
-	vector<const char*> layers = {},
-	vector<const char*> extensions = {}
+	const vector<const char*>& layers = {},
+	const vector<const char*>& extensions = {}
 );
 void killDevice( VkDevice device );
 
@@ -233,62 +223,61 @@ void present( VkQueue queue, VkSwapchainKHR swapchain, uint32_t swapchainImageIn
 
 
 // main()!
-////////////////////////
+//////////////////////////////////////////////////////////////////////////////////
 
 int main() try{
 	const uint32_t vertexBufferBinding = 0;
 
 	const float triangleSize = 1.6f;
-	vector<Vertex2D_ColorF_pack> triangle = {
+	const vector<Vertex2D_ColorF_pack> triangle = {
 		{ /*rb*/ { { 0.5f * triangleSize,  sqrtf( 3.0f ) * 0.25f * triangleSize} }, /*R*/{ {1.0f, 0.0f, 0.0f} }  },
 		{ /* t*/ { {                0.0f, -sqrtf( 3.0f ) * 0.25f * triangleSize} }, /*G*/{ {0.0f, 1.0f, 0.0f} }  },
 		{ /*lb*/ { {-0.5f * triangleSize,  sqrtf( 3.0f ) * 0.25f * triangleSize} }, /*B*/{ {0.0f, 0.0f, 1.0f} }  }
 	};
 
+
 	vector<const char*> layers;
-	if( ::debugVulkan ) layers.push_back( "VK_LAYER_LUNARG_standard_validation" );
+#if VULKAN_VALIDATION
+	if(  isLayerSupported( "VK_LAYER_LUNARG_standard_validation" )  ) layers.push_back( "VK_LAYER_LUNARG_standard_validation" );
+	else throw "VULKAN_VALIDATION is enabled but VK_LAYER_LUNARG_standard_validation layers are not supported!";
+#endif
 	if( ::fpsCounter ) layers.push_back( "VK_LAYER_LUNARG_monitor" );
-	layers = compileLayerList( layers );
 
-	auto supportedInstanceExtensions = getSupportedInstanceExtensions( layers );
-	auto platformSurfaceExtension = getPlatformSurfaceExtensionName();
-	vector<const char*> instanceExtensions = { VK_KHR_SURFACE_EXTENSION_NAME, platformSurfaceExtension.c_str() };
-	if(  ::debugVulkan && !isExtensionSupported( VK_EXT_DEBUG_REPORT_EXTENSION_NAME, supportedInstanceExtensions )  ){
-		cout << "WARNING: Requested " << VK_EXT_DEBUG_REPORT_EXTENSION_NAME << " extension is not supported. It will not be enabled." << endl;
-		::debugVulkan = false;
-	}
-	if( ::debugVulkan ) instanceExtensions.push_back( VK_EXT_DEBUG_REPORT_EXTENSION_NAME );
-	checkExtensionSupport( instanceExtensions, supportedInstanceExtensions );
 
-	VkInstance instance = initInstance( layers, instanceExtensions );
+	const auto platformSurfaceExtension = getPlatformSurfaceExtensionName();
+	const vector<const char*> instanceExtensions = {
+#if VULKAN_VALIDATION
+		VK_EXT_DEBUG_REPORT_EXTENSION_NAME,
+#endif
+		VK_KHR_SURFACE_EXTENSION_NAME,
+		platformSurfaceExtension.c_str()
+	};
 
-	VkDebugReportCallbackEXT debug = ::debugVulkan ? initDebug( instance, ::debugAmount ) : VK_NULL_HANDLE;
 
-	PlatformWindow window = initWindow( ::initialWindowWidth, ::initialWindowHeight );
-	VkSurfaceKHR surface = initSurface( instance, window );
+	const VkInstance instance = initInstance( layers, instanceExtensions );
 
-	VkPhysicalDevice physicalDevice = getPhysicalDevice( instance );
-	VkPhysicalDeviceFeatures features = {}; // don't need anything for this demo
-	VkPhysicalDeviceProperties physicalDeviceProperties = getPhysicalDeviceProperties( physicalDevice );
-	VkPhysicalDeviceMemoryProperties physicalDeviceMemoryProperties = getPhysicalDeviceMemoryProperties( physicalDevice );
-	uint32_t queueFamily = getQueueFamily( physicalDevice, surface );
+#if VULKAN_VALIDATION
+	const VkDebugReportCallbackEXT debug = initDebug( instance, ::debugAmount );
+#endif
 
-	auto supportedDeviceExtensions = getSupportedDeviceExtensions( physicalDevice, layers );
-	vector<const char*> deviceExtensions = { VK_KHR_SWAPCHAIN_EXTENSION_NAME };
-	checkExtensionSupport( deviceExtensions, supportedDeviceExtensions );
 
-	VkDevice device = initDevice(
-		physicalDevice,
-		features,
-		queueFamily,
-		layers,
-		deviceExtensions
-	);
+	const PlatformWindow window = initWindow( ::initialWindowWidth, ::initialWindowHeight );
+	const VkSurfaceKHR surface = initSurface( instance, window );
 
+	const VkPhysicalDevice physicalDevice = getPhysicalDevice( instance, surface );
+	const VkPhysicalDeviceProperties physicalDeviceProperties = getPhysicalDeviceProperties( physicalDevice );
+	const VkPhysicalDeviceMemoryProperties physicalDeviceMemoryProperties = getPhysicalDeviceMemoryProperties( physicalDevice );
+
+	const uint32_t queueFamily = getQueueFamily( physicalDevice, surface );
+
+	const VkPhysicalDeviceFeatures features = {}; // don't need any special feature for this demo
+	const vector<const char*> deviceExtensions = { VK_KHR_SWAPCHAIN_EXTENSION_NAME };
+
+	VkDevice device = initDevice( physicalDevice, features, queueFamily, layers, deviceExtensions );
 	VkQueue queue = getQueue( device, queueFamily, 0 );
 
-	VkSurfaceFormatKHR surfaceFormat = getSurfaceFormat( physicalDevice, surface );
 
+	VkSurfaceFormatKHR surfaceFormat = getSurfaceFormat( physicalDevice, surface );
 	VkRenderPass renderPass = initRenderPass( device, surfaceFormat );
 
 	VkShaderModule vertexShader = initShaderModule( device, ::vertexShaderFilename );
@@ -442,68 +431,83 @@ int main() try{
 	killSurface( instance, surface );
 	killWindow( window );
 
-	if( ::debugVulkan ) killDebug( instance, debug );
+#if VULKAN_VALIDATION
+	killDebug( instance, debug );
+#endif
 	killInstance( instance );
 
 	return ret;
 }
 catch( VulkanResultException vkE ){
-	cout << "ERROR: Terminated due to an uncaught VkResult exception: "
-	     << vkE.file << ":" << vkE.line << ":" << vkE.func << "() " << vkE.source << "() returned " << to_string( vkE.result )
-	     << endl;
+	logger << "ERROR: Terminated due to an uncaught VkResult exception: "
+	    << vkE.file << ":" << vkE.line << ":" << vkE.func << "() " << vkE.source << "() returned " << to_string( vkE.result )
+	    << std::endl;
 }
 catch( const char* e ){
-	cout << "ERROR: Terminated due to an uncaught exception: " << e << endl;
+	logger << "ERROR: Terminated due to an uncaught exception: " << e << std::endl;
 }
 catch( string e ){
-	cout << "ERROR: Terminated due to an uncaught exception: " << e << endl;
+	logger << "ERROR: Terminated due to an uncaught exception: " << e << std::endl;
 }
 catch( std::exception e ){
-	cout << "ERROR: Terminated due to an uncaught exception: " << e.what() << endl;
+	logger << "ERROR: Terminated due to an uncaught exception: " << e.what() << std::endl;
 }
 catch( ... ){
-	cout << "ERROR: Terminated due to an unrecognized uncaught exception." << endl;
+	logger << "ERROR: Terminated due to an unrecognized uncaught exception." << std::endl;
 }
 
 
 // Implementation
-//////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////
 
-vector<const char*> compileLayerList( const vector<const char*>& optionalLayers ){
+vector<VkLayerProperties> getSupportedLayers(){
+	return enumerate( vkEnumerateInstanceLayerProperties, "vkEnumerateInstanceLayerProperties" );
+}
+
+bool isLayerSupported( const char* layer, const vector<VkLayerProperties>& supportedLayers ){
+	const auto isSupportedPred = [layer]( const VkLayerProperties& prop ) -> bool{
+		return std::strcmp( layer, prop.layerName ) == 0;
+	};
+
+	return std::any_of( supportedLayers.begin(), supportedLayers.end(), isSupportedPred );
+}
+
+bool isLayerSupported( const char* layer ){
+	return isLayerSupported( layer, getSupportedLayers() );
+}
+
+// treat layers as optional; app can always run without em
+vector<const char*> compileLayerList( const vector<const char*>& requestedLayers, const vector<VkLayerProperties>& supportedLayers ){
 	vector<const char*> compiledLayerList;
 
-	auto supportedLayers = enumerate( vkEnumerateInstanceLayerProperties, "vkEnumerateInstanceLayerProperties" );
-
-	for( auto optLayer : optionalLayers ){
-		auto supportedCond = [optLayer]( const VkLayerProperties& prop ) -> bool{
-			return std::strcmp( optLayer, prop.layerName ) == 0;
-		};
-
-		bool isSupported = std::any_of( supportedLayers.begin(), supportedLayers.end(), supportedCond );
-
-		if( isSupported ) compiledLayerList.push_back( optLayer );
-		else cout << "WARNING: Requested " << optLayer << " layer is not supported. It will not be enabled." << endl;
+	for( const auto layer : requestedLayers ){
+		if(  isLayerSupported( layer, supportedLayers )  ) compiledLayerList.push_back( layer );
+		else logger << "WARNING: Requested layer " << layer << " is not supported. It will not be enabled." << std::endl;
 	}
 
 	return compiledLayerList;
+}
+
+vector<const char*> compileLayerList( const vector<const char*>& optionalLayers ){
+	return compileLayerList( optionalLayers, getSupportedLayers() );
 }
 
 vector<VkExtensionProperties> getSupportedInstanceExtensions( const vector<const char*>& providingLayers ){
 	auto supportedExtensions = enumerate( vkEnumerateInstanceExtensionProperties, nullptr, "vkEnumerateInstanceExtensionProperties" );
 
 	for( const auto pl : providingLayers ){
-		auto providedExtensions = enumerate( vkEnumerateInstanceExtensionProperties, pl, "vkEnumerateInstanceExtensionProperties" );
+		const auto providedExtensions = enumerate( vkEnumerateInstanceExtensionProperties, pl, "vkEnumerateInstanceExtensionProperties" );
 		supportedExtensions.insert( supportedExtensions.end(), providedExtensions.begin(), providedExtensions.end() );
 	}
 
 	return supportedExtensions;
 }
 
-vector<VkExtensionProperties> getSupportedDeviceExtensions( VkPhysicalDevice physDevice, const vector<const char*>& providingLayers ){
+vector<VkExtensionProperties> getSupportedDeviceExtensions( const VkPhysicalDevice physDevice, const vector<const char*>& providingLayers ){
 	auto supportedExtensions = enumerate( vkEnumerateDeviceExtensionProperties, physDevice, nullptr, "vkEnumerateDeviceExtensionProperties" );
 
-	for( auto pl : providingLayers ){
-		auto providedExtensions = enumerate( vkEnumerateDeviceExtensionProperties, physDevice, pl, "vkEnumerateDeviceExtensionProperties" );
+	for( const auto pl : providingLayers ){
+		const auto providedExtensions = enumerate( vkEnumerateDeviceExtensionProperties, physDevice, pl, "vkEnumerateDeviceExtensionProperties" );
 		supportedExtensions.insert( supportedExtensions.end(), providedExtensions.begin(), providedExtensions.end() );
 	}
 
@@ -511,69 +515,84 @@ vector<VkExtensionProperties> getSupportedDeviceExtensions( VkPhysicalDevice phy
 }
 
 bool isExtensionSupported( const char* extension, const vector<VkExtensionProperties>& supportedExtensions ){
-	auto supportedCond = [extension]( const VkExtensionProperties& prop ) -> bool{
+	const auto isSupportedPred = [extension]( const VkExtensionProperties& prop ) -> bool{
 		return std::strcmp( extension, prop.extensionName ) == 0;
 	};
 
-	return std::any_of( supportedExtensions.begin(), supportedExtensions.end(), supportedCond );
+	return std::any_of( supportedExtensions.begin(), supportedExtensions.end(), isSupportedPred );
 }
 
 bool checkExtensionSupport( const vector<const char*>& extensions, const vector<VkExtensionProperties>& supportedExtensions ){
 	bool allSupported = true;
 
-	for( auto extension : extensions ){
-		bool isSupported = isExtensionSupported( extension, supportedExtensions );
-		allSupported = allSupported && isSupported;
-
-		if( !isSupported ){
-			cout << "WARNING: Requested " << extension << " extension is not supported. Trying to enable it will likely fail." << endl;
+	for( const auto extension : extensions ){
+		if(  !isExtensionSupported( extension, supportedExtensions )  ){
+			allSupported = false;
+			logger << "WARNING: Requested extension " << extension << " is not supported. Trying to enable it will likely fail." << std::endl;
 		}
 	}
 
 	return allSupported;
 }
 
+bool checkInstanceExtensionSupport( const vector<const char*>& extensions, const vector<const char*>& providingLayers ){
+	return checkExtensionSupport(  extensions, getSupportedInstanceExtensions( providingLayers )  );
+}
 
-VkInstance initInstance( const vector<const char*> layers, const vector<const char*> extensions ){
-	VkApplicationInfo appInfo = {};
-	appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
-	appInfo.pApplicationName = u8"Hello Vulkan Triangle"; // Nice to meetcha, and what's your name driver?
-	appInfo.apiVersion = VK_API_VERSION_1_0; // this app is written against Vulkan 1.0 spec
+bool checkDeviceExtensionSupport( const VkPhysicalDevice physDevice, const vector<const char*>& extensions, const vector<const char*>& providingLayers ){
+	return checkExtensionSupport(  extensions, getSupportedDeviceExtensions( physDevice, providingLayers )  );
+}
 
-	VkInstanceCreateInfo instanceInfo{
+
+VkInstance initInstance( const vector<const char*>& layers, const vector<const char*>& extensions ){
+	const VkApplicationInfo appInfo = {
+		VK_STRUCTURE_TYPE_APPLICATION_INFO,
+		nullptr, // pNext
+		u8"Hello Vulkan Triangle", // Nice to meetcha, and what's your name driver?
+		0, // app version
+		nullptr, // engine name
+		0, // engine version
+		VK_API_VERSION_1_0 // this app is written against the Vulkan 1.0 spec
+	};
+
+	const auto supportedRequestedLayers = compileLayerList( layers );
+	checkInstanceExtensionSupport( extensions, supportedRequestedLayers );
+
+#if VULKAN_VALIDATION
+	// in effect during vkCreateInstance and vkDestroyInstance duration (because callback object cannot be created without instance)
+	const VkDebugReportCallbackCreateInfoEXT debugCreateInfo{
+		VK_STRUCTURE_TYPE_DEBUG_REPORT_CALLBACK_CREATE_INFO_EXT,
+		nullptr, // pNext
+		::debugAmount,
+		::genericDebugCallback,
+		nullptr // pUserData
+	};
+#endif
+
+	const VkInstanceCreateInfo instanceInfo{
 		VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
-		nullptr, // pNext for extensions use
+#if VULKAN_VALIDATION
+		&debugCreateInfo,
+#else
+		nullptr, // pNext
+#endif
 		0, // flags - reserved for future use
 		&appInfo,
-		static_cast<uint32_t>( layers.size() ),
-		layers.data(),
+		static_cast<uint32_t>( supportedRequestedLayers.size() ),
+		supportedRequestedLayers.data(),
 		static_cast<uint32_t>( extensions.size() ),
 		extensions.data()
 	};
 
-
-	VkDebugReportCallbackCreateInfoEXT debugCreateInfo{
-		VK_STRUCTURE_TYPE_DEBUG_REPORT_CALLBACK_CREATE_INFO_EXT,
-		nullptr,
-		::debugAmount,
-		genericDebugCallback,
-		nullptr
-	};
-
-	if( ::debugVulkan ){
-		instanceInfo.pNext = &debugCreateInfo; // valid just for createInstance/destroyInstance execution
-	}
-
-
 	VkInstance instance;
-	VkResult errorCode = vkCreateInstance( &instanceInfo, nullptr, &instance ); RESULT_HANDLER( errorCode, "vkCreateInstance" );
+	const VkResult errorCode = vkCreateInstance( &instanceInfo, nullptr, &instance ); RESULT_HANDLER( errorCode, "vkCreateInstance" );
 
 	loadInstanceExtensionsCommands( instance, extensions );
 
 	return instance;
 }
 
-void killInstance( VkInstance instance ){
+void killInstance( const VkInstance instance ){
 	unloadInstanceExtensionsCommands( instance );
 
 	vkDestroyInstance( instance, nullptr );
@@ -581,24 +600,65 @@ void killInstance( VkInstance instance ){
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-vector<VkPhysicalDevice> getPhysicalDevices( VkInstance instance ){
-	return enumerate(
-		vkEnumeratePhysicalDevices,
-		instance,
-		"vkEnumeratePhysicalDevices"
-	);
+bool isPresentationSupported( const VkPhysicalDevice physDevice, const uint32_t queueFamily, const VkSurfaceKHR surface ){
+	VkBool32 supported;
+	const VkResult errorCode = vkGetPhysicalDeviceSurfaceSupportKHR( physDevice, queueFamily, surface, &supported ); RESULT_HANDLER( errorCode, "vkGetPhysicalDeviceSurfaceSupportKHR" );
+
+	return supported == VK_TRUE;
 }
 
-VkPhysicalDevice getPhysicalDevice( VkInstance instance ){
-	vector<VkPhysicalDevice> devices = getPhysicalDevices( instance );
+bool isPresentationSupported( const VkPhysicalDevice physDevice, const VkSurfaceKHR surface ){
+	uint32_t qfCount;
+	vkGetPhysicalDeviceQueueFamilyProperties( physDevice, &qfCount, nullptr );
 
-	if( devices.empty() ) throw "No VkPhysicalDevice found!";
-	else if( devices.size() > 1 ){
-		cout << "INFO: More than one VkPhysicalDevice found - just picking the first one.\n";
+	for( uint32_t qf = 0; qf < qfCount; ++qf ){
+		if(  isPresentationSupported( physDevice, qf, surface )  ) return true;
 	}
 
-	TODO( "Should try to pick the best, not first" )
-	return devices[0];
+	return false;
+}
+
+VkPhysicalDevice getPhysicalDevice( const VkInstance instance, const VkSurfaceKHR surface ){
+	vector<VkPhysicalDevice> devices = enumerate( vkEnumeratePhysicalDevices, instance, "vkEnumeratePhysicalDevices" );
+
+	if( surface ){
+		for( auto it = devices.begin(); it != devices.end(); ){
+			const auto& pd = *it;
+
+			if(  !isPresentationSupported( pd, surface )  ) it = devices.erase( it );
+			else ++it;
+		}
+	}
+
+	if( devices.empty() ) throw string("ERROR: No Physical Devices (GPUs) ") + (surface ? "with presentation support " : "") + "detected!";
+	else if( devices.size() == 1 ){
+		return devices[0];
+	}
+	else{
+		for( const auto pd : devices ){
+			const VkPhysicalDeviceProperties pdp = getPhysicalDeviceProperties( pd );
+
+			if( pdp.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU ){
+#if VULKAN_VALIDATION
+				vkDebugReportMessageEXT(
+					instance, VK_DEBUG_REPORT_WARNING_BIT_EXT, VK_DEBUG_REPORT_OBJECT_TYPE_INSTANCE_EXT, handleToUint64(instance), __LINE__, 
+					1, u8"application", u8"More than one Physical Devices (GPU) found. Choosing the first dedicated one."
+				);
+#endif
+
+				return pd;
+			}
+		}
+
+#if VULKAN_VALIDATION
+		vkDebugReportMessageEXT(
+			instance, VK_DEBUG_REPORT_WARNING_BIT_EXT, VK_DEBUG_REPORT_OBJECT_TYPE_INSTANCE_EXT, handleToUint64(instance), __LINE__, 
+			1, u8"application", u8"More than one Physical Devices (GPU) found. Just choosing the first one."
+		);
+#endif
+
+		return devices[0];
+	}
 }
 
 VkPhysicalDeviceProperties getPhysicalDeviceProperties( VkPhysicalDevice physicalDevice ){
@@ -614,91 +674,79 @@ VkPhysicalDeviceMemoryProperties getPhysicalDeviceMemoryProperties( VkPhysicalDe
 }
 
 vector<VkQueueFamilyProperties> getQueueFamilyProperties( VkPhysicalDevice device ){
-	vector<VkQueueFamilyProperties> queueFamilies;
-
 	uint32_t queueFamiliesCount;
 	vkGetPhysicalDeviceQueueFamilyProperties( device, &queueFamiliesCount, nullptr );
 
-	queueFamilies.resize( queueFamiliesCount );
+	vector<VkQueueFamilyProperties> queueFamilies( queueFamiliesCount );
 	vkGetPhysicalDeviceQueueFamilyProperties( device, &queueFamiliesCount, queueFamilies.data() );
 
 	return queueFamilies;
 }
 
-bool getPresentationSupport( VkPhysicalDevice physDevice, uint32_t queueFamily, VkSurfaceKHR surface ){
-	VkBool32 supported;
-	VkResult errorCode = vkGetPhysicalDeviceSurfaceSupportKHR( physDevice, queueFamily, surface, &supported ); RESULT_HANDLER( errorCode, "vkGetPhysicalDeviceSurfaceSupportKHR" );
+uint32_t getQueueFamily( const VkPhysicalDevice physDevice, const VkSurfaceKHR surface ){
+	const auto qfps = getQueueFamilyProperties( physDevice );
 
-	return supported == VK_TRUE;
-}
+	TODO( "Should contain the possibility of separate graphics and present queue!" )
 
-uint32_t getQueueFamily( VkPhysicalDevice physDevice, VkSurfaceKHR surface ){
-	auto qfps = getQueueFamilyProperties( physDevice );
-	uint32_t qfi = 0;
-
-	TODO( "Should contain possibility of separate graphics and present queues?" )
-
-	for( ; qfi < qfps.size(); ++qfi ){
-		if( qfps[qfi].queueFlags & VK_QUEUE_GRAPHICS_BIT ){
-			if(  getPresentationSupport( physDevice, qfi, surface )  ){
-				return qfi;
-			}
+	for( uint32_t qfi = 0; qfi < qfps.size(); ++qfi ){
+		if(  (qfps[qfi].queueFlags & VK_QUEUE_GRAPHICS_BIT) && qfps[qfi].queueCount && isPresentationSupported( physDevice, qfi, surface )  ){
+			return qfi;
 		}
 	}
 
-	throw "Can't find a queue family supporting both graphics + present operations!";
+	throw "Cannot find a queue family supporting both graphics + present operations!";
 }
 
 VkDevice initDevice(
-	VkPhysicalDevice physDevice,
+	const VkPhysicalDevice physDevice,
 	const VkPhysicalDeviceFeatures& features,
-	uint32_t queueFamilyIndex,
-	vector<const char*> layers,
-	vector<const char*> extensions
+	const uint32_t queueFamilyIndex,
+	const vector<const char*>& layers,
+	const vector<const char*>& extensions
 ){
+	checkDeviceExtensionSupport( physDevice, extensions, layers );
 
 	const float priority[] = {1.0f};
-	VkDeviceQueueCreateInfo qci{
+	const VkDeviceQueueCreateInfo qci{
 		VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
-		nullptr,
-		0,
+		nullptr, // pNext
+		0, // flags
 		queueFamilyIndex,
-		1,
+		1, // queue count
 		priority
 	};
 
-	vector<VkDeviceQueueCreateInfo> queues;
-	queues.push_back( qci );
+	const vector<VkDeviceQueueCreateInfo> queues = { qci };
 
-	VkDeviceCreateInfo deviceInfo{
+	const VkDeviceCreateInfo deviceInfo{
 		VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
-		nullptr,
-		0,
-		(uint32_t)queues.size(),
+		nullptr, // pNext
+		0, // flags
+		static_cast<uint32_t>( queues.size() ),
 		queues.data(),
-		(uint32_t)layers.size(),
+		static_cast<uint32_t>( layers.size() ),
 		layers.data(),
-		(uint32_t)extensions.size(),
+		static_cast<uint32_t>( extensions.size() ),
 		extensions.data(),
 		&features
 	};
 
 
 	VkDevice device;
-	VkResult errorCode = vkCreateDevice( physDevice, &deviceInfo, nullptr, &device ); RESULT_HANDLER( errorCode, "vkCreateDevice" );
+	const VkResult errorCode = vkCreateDevice( physDevice, &deviceInfo, nullptr, &device ); RESULT_HANDLER( errorCode, "vkCreateDevice" );
 
 	loadDeviceExtensionsCommands( device, extensions );
 
 	return device;
 }
 
-void killDevice( VkDevice device ){
+void killDevice( const VkDevice device ){
 	unloadDeviceExtensionsCommands( device );
 
 	vkDestroyDevice( device, nullptr );
 }
 
-VkQueue getQueue( VkDevice device, uint32_t queueFamily, uint32_t queueIndex ){
+VkQueue getQueue( const VkDevice device, const uint32_t queueFamily, const uint32_t queueIndex ){
 	VkQueue queue;
 	vkGetDeviceQueue( device, queueFamily, queueIndex, &queue );
 
@@ -863,10 +911,10 @@ VkImageView initImageView( VkDevice device, VkImage image, VkFormat format ){
 		{ VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY },
 		{
 			VK_IMAGE_ASPECT_COLOR_BIT,
-			/* base mip-level */ 0,
-			/* level count */ VK_REMAINING_MIP_LEVELS,
-			/* base array layer */ 0,
-			/* array layer count */ VK_REMAINING_ARRAY_LAYERS
+			0, // base mip-level
+			VK_REMAINING_MIP_LEVELS, // level count
+			0, // base array layer
+			VK_REMAINING_ARRAY_LAYERS // array layer count
 		}
 	};
 
@@ -947,14 +995,14 @@ vector<VkPresentModeKHR> getSurfacePresentModes( VkPhysicalDevice physicalDevice
 
 int selectedMode = 0;
 
-TODO( "Could use debug_report instead of couts" )
+TODO( "Could use debug_report instead of log" )
 VkPresentModeKHR getSurfacePresentMode( VkPhysicalDevice physicalDevice, VkSurfaceKHR surface ){
 	vector<VkPresentModeKHR> modes = getSurfacePresentModes( physicalDevice, surface );
 
 	for( auto m : modes ){
 		if( m == ::presentMode ){
 			if( selectedMode != 0 ){
-				cout << "INFO: Your preferred present mode became supported. Switching to it.\n";
+				logger << "INFO: Your preferred present mode became supported. Switching to it.\n";
 			}
 
 			selectedMode = 0;
@@ -967,7 +1015,7 @@ VkPresentModeKHR getSurfacePresentMode( VkPhysicalDevice physicalDevice, VkSurfa
 	for( auto m : modes ){
 		if( m == VK_PRESENT_MODE_FIFO_KHR ){
 			if( selectedMode != 1 ){
-				cout << "WARNING: Your preferred present mode is not supported. Switching to VK_PRESENT_MODE_FIFO_KHR.\n";
+				logger << "WARNING: Your preferred present mode is not supported. Switching to VK_PRESENT_MODE_FIFO_KHR.\n";
 			}
 
 			selectedMode = 1;
@@ -979,7 +1027,7 @@ VkPresentModeKHR getSurfacePresentMode( VkPhysicalDevice physicalDevice, VkSurfa
 	if( modes.empty() ) throw "Bugged driver reports no supported present modes.";
 	else{
 		if( selectedMode != 2 ){
-			cout << "WARNING: Bugged drivers. VK_PRESENT_MODE_FIFO_KHR not supported. Switching to whatever is.\n";
+			logger << "WARNING: Bugged drivers. VK_PRESENT_MODE_FIFO_KHR not supported. Switching to whatever is.\n";
 		}
 
 		selectedMode = 2;
@@ -1622,8 +1670,6 @@ void submitToQueue( VkQueue queue, VkCommandBuffer commandBuffer, VkSemaphore im
 }
 
 void present( VkQueue queue, VkSwapchainKHR swapchain, uint32_t swapchainImageIndex, VkSemaphore renderDoneS ){
-	//VkResult errorCodeSwapchain;
-
 	VkPresentInfoKHR presentInfo{
 		VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
 		nullptr, // pNext
@@ -1632,10 +1678,8 @@ void present( VkQueue queue, VkSwapchainKHR swapchain, uint32_t swapchainImageIn
 		1, // swapchain count
 		&swapchain,
 		&swapchainImageIndex,
-		nullptr //&errorCodeSwapchain
+		nullptr // pResults
 	};
 
 	VkResult errorCode = vkQueuePresentKHR( queue, &presentInfo ); RESULT_HANDLER( errorCode, "vkQueuePresentKHR" );
-
-	//RESULT_HANDLER( errorCodeSwapchain, "vkQueuePresentKHR" );
 }
