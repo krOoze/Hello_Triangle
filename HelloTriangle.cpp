@@ -89,7 +89,11 @@ constexpr char fragmentShaderFilename[] = "triangle.frag.spv";
 // needed stuff for main() -- forward declarations
 //////////////////////////////////////////////////////////////////////////////////
 
-bool isLayerSupported( const char* layer );
+bool isLayerSupported( const char* layer, const vector<VkLayerProperties>& supportedLayers );
+// treat layers as optional; app can always run without em -- i.e. return those supported
+vector<const char*> checkInstanceLayerSupport( const vector<const char*>& requestedLayers, const vector<VkLayerProperties>& supportedLayers );
+vector<VkExtensionProperties> getSupportedInstanceExtensions( const vector<const char*>& providingLayers );
+bool checkExtensionSupport( const vector<const char*>& extensions, const vector<VkExtensionProperties>& supportedExtensions );
 
 VkInstance initInstance( const vector<const char*>& layers = {}, const vector<const char*>& extensions = {} );
 void killInstance( VkInstance instance );
@@ -149,8 +153,6 @@ VkSurfaceFormatKHR getSurfaceFormat( VkPhysicalDevice physicalDevice, VkSurfaceK
 
 VkSwapchainKHR initSwapchain( VkPhysicalDevice physicalDevice, VkDevice device, VkSurfaceKHR surface, VkSurfaceFormatKHR surfaceFormat, VkSurfaceCapabilitiesKHR capabilities, VkSwapchainKHR oldSwapchain = VK_NULL_HANDLE );
 void killSwapchain( VkDevice device, VkSwapchainKHR swapchain );
-
-vector<VkImage> getSwapchainImages( VkDevice device, VkSwapchainKHR swapchain );
 
 uint32_t getNextImageIndex( VkDevice device, VkSwapchainKHR swapchain, VkSemaphore imageReadyS );
 
@@ -235,26 +237,29 @@ int main() try{
 		{ /*lb*/ { {-0.5f * triangleSize,  sqrtf( 3.0f ) * 0.25f * triangleSize} }, /*B*/{ {0.0f, 0.0f, 1.0f} }  }
 	};
 
-
-	vector<const char*> layers;
+	const auto supportedLayers = enumerate<VkLayerProperties>();
+	vector<const char*> requestedLayers;
 #if VULKAN_VALIDATION
-	if(  isLayerSupported( "VK_LAYER_LUNARG_standard_validation" )  ) layers.push_back( "VK_LAYER_LUNARG_standard_validation" );
+	if(  isLayerSupported( "VK_LAYER_LUNARG_standard_validation", supportedLayers )  ) requestedLayers.push_back( "VK_LAYER_LUNARG_standard_validation" );
 	else throw "VULKAN_VALIDATION is enabled but VK_LAYER_LUNARG_standard_validation layers are not supported!";
 #endif
-	if( ::fpsCounter ) layers.push_back( "VK_LAYER_LUNARG_monitor" );
+	if( ::fpsCounter ) requestedLayers.push_back( "VK_LAYER_LUNARG_monitor" );
+	requestedLayers = checkInstanceLayerSupport( requestedLayers, supportedLayers );
 
 
+	const auto supportedInstanceExtensions = getSupportedInstanceExtensions( requestedLayers );
 	const auto platformSurfaceExtension = getPlatformSurfaceExtensionName();
-	const vector<const char*> instanceExtensions = {
+	const vector<const char*> requestedInstanceExtensions = {
 #if VULKAN_VALIDATION
 		VK_EXT_DEBUG_REPORT_EXTENSION_NAME,
 #endif
 		VK_KHR_SURFACE_EXTENSION_NAME,
 		platformSurfaceExtension.c_str()
 	};
+	checkExtensionSupport( requestedInstanceExtensions, supportedInstanceExtensions );
 
 
-	const VkInstance instance = initInstance( layers, instanceExtensions );
+	const VkInstance instance = initInstance( requestedLayers, requestedInstanceExtensions );
 
 #if VULKAN_VALIDATION
 	const VkDebugReportCallbackEXT debug = initDebug( instance, ::debugAmount );
@@ -273,7 +278,7 @@ int main() try{
 	const VkPhysicalDeviceFeatures features = {}; // don't need any special feature for this demo
 	const vector<const char*> deviceExtensions = { VK_KHR_SWAPCHAIN_EXTENSION_NAME };
 
-	VkDevice device = initDevice( physicalDevice, features, queueFamily, layers, deviceExtensions );
+	VkDevice device = initDevice( physicalDevice, features, queueFamily, requestedLayers, deviceExtensions );
 	VkQueue queue = getQueue( device, queueFamily, 0 );
 
 
@@ -343,7 +348,7 @@ int main() try{
 
 		swapchain = initSwapchain( physicalDevice, device, surface, surfaceFormat, capabilities, swapchain );
 
-		vector<VkImage> swapchainImages = getSwapchainImages( device, swapchain );
+		vector<VkImage> swapchainImages = enumerate<VkImage>( device, swapchain );
 		swapchainImageViews = initSwapchainImageViews( device, swapchainImages, surfaceFormat.format );
 		framebuffers = initFramebuffers( device, renderPass, swapchainImageViews, surfaceSize.width, surfaceSize.height );
 
@@ -460,10 +465,6 @@ catch( ... ){
 // Implementation
 //////////////////////////////////////////////////////////////////////////////////
 
-vector<VkLayerProperties> getSupportedLayers(){
-	return enumerate<VkLayerProperties>();
-}
-
 bool isLayerSupported( const char* layer, const vector<VkLayerProperties>& supportedLayers ){
 	const auto isSupportedPred = [layer]( const VkLayerProperties& prop ) -> bool{
 		return std::strcmp( layer, prop.layerName ) == 0;
@@ -472,12 +473,7 @@ bool isLayerSupported( const char* layer, const vector<VkLayerProperties>& suppo
 	return std::any_of( supportedLayers.begin(), supportedLayers.end(), isSupportedPred );
 }
 
-bool isLayerSupported( const char* layer ){
-	return isLayerSupported( layer, getSupportedLayers() );
-}
-
-// treat layers as optional; app can always run without em
-vector<const char*> compileLayerList( const vector<const char*>& requestedLayers, const vector<VkLayerProperties>& supportedLayers ){
+vector<const char*> checkInstanceLayerSupport( const vector<const char*>& requestedLayers, const vector<VkLayerProperties>& supportedLayers ){
 	vector<const char*> compiledLayerList;
 
 	for( const auto layer : requestedLayers ){
@@ -488,8 +484,8 @@ vector<const char*> compileLayerList( const vector<const char*>& requestedLayers
 	return compiledLayerList;
 }
 
-vector<const char*> compileLayerList( const vector<const char*>& optionalLayers ){
-	return compileLayerList( optionalLayers, getSupportedLayers() );
+vector<const char*> checkInstanceLayerSupport( const vector<const char*>& optionalLayers ){
+	return checkInstanceLayerSupport( optionalLayers, enumerate<VkLayerProperties>() );
 }
 
 vector<VkExtensionProperties> getSupportedInstanceExtensions( const vector<const char*>& providingLayers ){
@@ -535,10 +531,6 @@ bool checkExtensionSupport( const vector<const char*>& extensions, const vector<
 	return allSupported;
 }
 
-bool checkInstanceExtensionSupport( const vector<const char*>& extensions, const vector<const char*>& providingLayers ){
-	return checkExtensionSupport(  extensions, getSupportedInstanceExtensions( providingLayers )  );
-}
-
 bool checkDeviceExtensionSupport( const VkPhysicalDevice physDevice, const vector<const char*>& extensions, const vector<const char*>& providingLayers ){
 	return checkExtensionSupport(  extensions, getSupportedDeviceExtensions( physDevice, providingLayers )  );
 }
@@ -554,9 +546,6 @@ VkInstance initInstance( const vector<const char*>& layers, const vector<const c
 		0, // engine version
 		VK_API_VERSION_1_0 // this app is written against the Vulkan 1.0 spec
 	};
-
-	const auto supportedRequestedLayers = compileLayerList( layers );
-	checkInstanceExtensionSupport( extensions, supportedRequestedLayers );
 
 #if VULKAN_VALIDATION
 	// in effect during vkCreateInstance and vkDestroyInstance duration (because callback object cannot be created without instance)
@@ -578,8 +567,8 @@ VkInstance initInstance( const vector<const char*>& layers, const vector<const c
 #endif
 		0, // flags - reserved for future use
 		&appInfo,
-		static_cast<uint32_t>( supportedRequestedLayers.size() ),
-		supportedRequestedLayers.data(),
+		static_cast<uint32_t>( layers.size() ),
+		layers.data(),
 		static_cast<uint32_t>( extensions.size() ),
 		extensions.data()
 	};
@@ -938,15 +927,11 @@ void killSurface( VkInstance instance, VkSurfaceKHR surface ){
 	vkDestroySurfaceKHR( instance, surface, nullptr );
 }
 
-vector<VkSurfaceFormatKHR> getSurfaceFormats( VkPhysicalDevice physicalDevice, VkSurfaceKHR surface ){
-	return enumerate<VkSurfaceFormatKHR>( physicalDevice, surface );
-}
-
 VkSurfaceFormatKHR getSurfaceFormat( VkPhysicalDevice physicalDevice, VkSurfaceKHR surface ){
 	const VkFormat preferredFormat1 = VK_FORMAT_B8G8R8A8_UNORM; 
 	const VkFormat preferredFormat2 = VK_FORMAT_B8G8R8A8_SRGB;
 
-	vector<VkSurfaceFormatKHR> formats = getSurfaceFormats( physicalDevice, surface );
+	vector<VkSurfaceFormatKHR> formats = enumerate<VkSurfaceFormatKHR>( physicalDevice, surface );
 
 	if( formats.empty() ) throw "No surface formats offered by Vulkan!";
 
@@ -980,16 +965,11 @@ VkSurfaceCapabilitiesKHR getSurfaceCapabilities( VkPhysicalDevice physicalDevice
 	return capabilities;
 }
 
-vector<VkPresentModeKHR> getSurfacePresentModes( VkPhysicalDevice physicalDevice, VkSurfaceKHR surface ){
-		return enumerate<VkPresentModeKHR>( physicalDevice, surface );
-}
-
-
 int selectedMode = 0;
 
 TODO( "Could use debug_report instead of log" )
 VkPresentModeKHR getSurfacePresentMode( VkPhysicalDevice physicalDevice, VkSurfaceKHR surface ){
-	vector<VkPresentModeKHR> modes = getSurfacePresentModes( physicalDevice, surface );
+	vector<VkPresentModeKHR> modes = enumerate<VkPresentModeKHR>( physicalDevice, surface );
 
 	for( auto m : modes ){
 		if( m == ::presentMode ){
@@ -1070,10 +1050,6 @@ VkSwapchainKHR initSwapchain( VkPhysicalDevice physicalDevice, VkDevice device, 
 
 void killSwapchain( VkDevice device, VkSwapchainKHR swapchain ){
 	vkDestroySwapchainKHR( device, swapchain, nullptr );
-}
-
-vector<VkImage> getSwapchainImages( VkDevice device, VkSwapchainKHR swapchain ){
-	return enumerate<VkImage>( device, swapchain );
 }
 
 uint32_t getNextImageIndex( VkDevice device, VkSwapchainKHR swapchain, VkSemaphore imageReadyS ){
