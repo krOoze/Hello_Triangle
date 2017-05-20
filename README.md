@@ -69,8 +69,7 @@ Files
 | xcbPlatform.h | WSI XCB platform-dependent stuff |
 | xlibPlatform.h | WSI XLIB platform-dependent stuff |
 | Vertex.h | Just simple Vertex definitions |
-| EnumerateScheme.h | A scheme to unify usage of all Vulkan `vkEnumerate*` commands |
-| FunctionTraits.h | A template to get type information about functions (to enable EnumerateScheme.h magic) |
+| EnumerateScheme.h | A scheme to unify usage of most Vulkan `vkEnumerate*` and `vkGet*` commands |
 | to_string.h | Workaround for broken Standard C++ library in MinGW |
 | ExtensionLoader.h | Functions handling loading of Vulkan extension commands |
 | triangle.vert | The vertex shader program in GLSL |

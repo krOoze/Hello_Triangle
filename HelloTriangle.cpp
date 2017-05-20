@@ -461,7 +461,7 @@ catch( ... ){
 //////////////////////////////////////////////////////////////////////////////////
 
 vector<VkLayerProperties> getSupportedLayers(){
-	return enumerate( vkEnumerateInstanceLayerProperties, "vkEnumerateInstanceLayerProperties" );
+	return enumerate<VkLayerProperties>();
 }
 
 bool isLayerSupported( const char* layer, const vector<VkLayerProperties>& supportedLayers ){
@@ -493,10 +493,10 @@ vector<const char*> compileLayerList( const vector<const char*>& optionalLayers 
 }
 
 vector<VkExtensionProperties> getSupportedInstanceExtensions( const vector<const char*>& providingLayers ){
-	auto supportedExtensions = enumerate( vkEnumerateInstanceExtensionProperties, nullptr, "vkEnumerateInstanceExtensionProperties" );
+	auto supportedExtensions = enumerate<VkExtensionProperties>();
 
 	for( const auto pl : providingLayers ){
-		const auto providedExtensions = enumerate( vkEnumerateInstanceExtensionProperties, pl, "vkEnumerateInstanceExtensionProperties" );
+		const auto providedExtensions = enumerate<VkExtensionProperties>( pl );
 		supportedExtensions.insert( supportedExtensions.end(), providedExtensions.begin(), providedExtensions.end() );
 	}
 
@@ -504,10 +504,10 @@ vector<VkExtensionProperties> getSupportedInstanceExtensions( const vector<const
 }
 
 vector<VkExtensionProperties> getSupportedDeviceExtensions( const VkPhysicalDevice physDevice, const vector<const char*>& providingLayers ){
-	auto supportedExtensions = enumerate( vkEnumerateDeviceExtensionProperties, physDevice, nullptr, "vkEnumerateDeviceExtensionProperties" );
+	auto supportedExtensions = enumerate<VkExtensionProperties>( physDevice );
 
 	for( const auto pl : providingLayers ){
-		const auto providedExtensions = enumerate( vkEnumerateDeviceExtensionProperties, physDevice, pl, "vkEnumerateDeviceExtensionProperties" );
+		const auto providedExtensions = enumerate<VkExtensionProperties>( physDevice, pl );
 		supportedExtensions.insert( supportedExtensions.end(), providedExtensions.begin(), providedExtensions.end() );
 	}
 
@@ -619,7 +619,7 @@ bool isPresentationSupported( const VkPhysicalDevice physDevice, const VkSurface
 }
 
 VkPhysicalDevice getPhysicalDevice( const VkInstance instance, const VkSurfaceKHR surface ){
-	vector<VkPhysicalDevice> devices = enumerate( vkEnumeratePhysicalDevices, instance, "vkEnumeratePhysicalDevices" );
+	vector<VkPhysicalDevice> devices = enumerate<VkPhysicalDevice>( instance );
 
 	if( surface ){
 		for( auto it = devices.begin(); it != devices.end(); ){
@@ -939,12 +939,7 @@ void killSurface( VkInstance instance, VkSurfaceKHR surface ){
 }
 
 vector<VkSurfaceFormatKHR> getSurfaceFormats( VkPhysicalDevice physicalDevice, VkSurfaceKHR surface ){
-	return enumerate(
-		vkGetPhysicalDeviceSurfaceFormatsKHR,
-		physicalDevice,
-		surface,
-		"vkGetPhysicalDeviceSurfaceFormatsKHR"
-	);
+	return enumerate<VkSurfaceFormatKHR>( physicalDevice, surface );
 }
 
 VkSurfaceFormatKHR getSurfaceFormat( VkPhysicalDevice physicalDevice, VkSurfaceKHR surface ){
@@ -986,12 +981,7 @@ VkSurfaceCapabilitiesKHR getSurfaceCapabilities( VkPhysicalDevice physicalDevice
 }
 
 vector<VkPresentModeKHR> getSurfacePresentModes( VkPhysicalDevice physicalDevice, VkSurfaceKHR surface ){
-		return enumerate(
-			vkGetPhysicalDeviceSurfacePresentModesKHR,
-			physicalDevice,
-			surface,
-			"vkGetPhysicalDeviceSurfacePresentModesKHR"
-		);
+		return enumerate<VkPresentModeKHR>( physicalDevice, surface );
 }
 
 
@@ -1083,12 +1073,7 @@ void killSwapchain( VkDevice device, VkSwapchainKHR swapchain ){
 }
 
 vector<VkImage> getSwapchainImages( VkDevice device, VkSwapchainKHR swapchain ){
-	return enumerate(
-		vkGetSwapchainImagesKHR,
-		device,
-		swapchain,
-		"vkGetSwapchainImagesKHR"
-	);
+	return enumerate<VkImage>( device, swapchain );
 }
 
 uint32_t getNextImageIndex( VkDevice device, VkSwapchainKHR swapchain, VkSemaphore imageReadyS ){

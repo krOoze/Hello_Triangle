@@ -1,33 +1,24 @@
-// Template helper for many of the vkGet* and vkEnumerate* commands
+// Scheme for the various vkGet* and vkEnumerate* commands
 //
-// They are all used almost the same,
-// so this template's purpose is to help DRY principle.
+// Following the DRY principle, this implements getting a vector of enumerants
+// from the similar enumeration commands that return VK_INCOMPELTE.
 
 #ifndef ENUMERATE_SCHEME_H
 #define ENUMERATE_SCHEME_H
 
 #include <vector>
 #include <functional>
-#include <tuple>
-#include <type_traits>
 
 #include <vulkan/vulkan.h>
 
-#include "FunctionTraits.h"
+#include "ErrorHandling.h"
 
-
-// scheme for all Vulkan style enumerations
-// count + array of Elements are the common parameters for all the kinds of Vulkan enumeration comands
-//
-// it can be used directly with command taking two parameters [count, out array]
-// e.g. for vkEnumerateInstanceLayerProperties( uint32_t*, VkLayerProperties* )
-// vkEnumerateInstanceLayerProperties being the Cmd cmd
-// usage: vector<VkLayerProperties> lps = enumerate( vkEnumerateInstanceLayerProperties, "vkEnumerateInstanceLayerProperties" );
-template< typename Cmd >
-decltype(auto) enumerate( Cmd cmd, const char* cmdName ){
-	using Element = std::remove_pointer_t<  function_param_t< Cmd, 1 >  >; // i.e. the 2nd parameter type of the cmd (dereferenced)
-
-	vector<Element> enumerants;
+// the enumeration scheme
+// takes function VkResult cmd( uint32_t count, Element* pArray ) and Vulkan command name (for debugging purposes)
+// returns vector<Element> which contains the enumerants, or throws
+template< typename Element, typename Cmd >
+decltype(auto) enumerateScheme( Cmd cmd, const char* cmdName ){
+	std::vector<Element> enumerants;
 
 	VkResult errorCode;
 	uint32_t enumerantsCount;
@@ -49,57 +40,109 @@ decltype(auto) enumerate( Cmd cmd, const char* cmdName ){
 }
 
 
-// scheme adaptor for 3 parameter Vulkan enumerations [dispatch, count, out array]
-// or for global Vulkan enumerations [source, count, out array]
-//
-// e.g. for vkEnumeratePhysicalDevices( VkInstance, uint32_t*, VkPhysicalDevice* );
-// vkEnumeratePhysicalDevices being the Cmd cmd, and the instance being the Dispatch d
-// usage: vector<VkPhysicalDevice> pds = enumerate( vkEnumeratePhysicalDevices, instance, "vkEnumeratePhysicalDevices" );
-// or
-// e.g. for vkEnumerateInstanceExtensionProperties( const char*, uint32_t*, VkExtensionProperties* );
-// vkEnumerateInstanceExtensionProperties being the Cmd cmd, and the layer name being the Source s
-// usage: vector<VkExtensionProperties> eps = enumerate( vkEnumerateInstanceExtensionProperties, nullptr, "vkEnumerateInstanceExtensionProperties" );
-template<
-	typename Cmd,
-	typename DispatchOrSource
->
-decltype(auto) enumerate( Cmd cmd, DispatchOrSource dors, const char* cmdName ){
-	using ElementArray = function_param_t< Cmd, 2 >; // i.e. the 3rd parameter type of the cmd
+// Adapters for specific Vulkan commands
+///////////////////////////////////////////////
 
-	std::function<  VkResult( uint32_t*, ElementArray )  > adapted_cmd = std::bind(
-		cmd,
-		dors,
-		std::placeholders::_1,
-		std::placeholders::_2
-	);
+template< typename Element >
+std::vector<Element> enumerate();
 
-	return enumerate( adapted_cmd, cmdName );
+template< typename Element, typename Source >
+std::vector<Element> enumerate( Source );
+
+template< typename Element, typename Dispatch >
+std::vector<Element> enumerate( Dispatch );
+
+template< typename Element, typename Dispatch, typename Source >
+std::vector<Element> enumerate( Dispatch, Source );
+
+// for vkEnumerateInstanceLayerProperties -- auto v = enumerate<VkLayerProperties>();
+TODO( "Considering adding tag types here for clarity; e.g. enumerate<VkInstance, VkLayerProperties>() and enumerate<VkDevice, VkLayerProperties>()." )
+template<>
+std::vector<VkLayerProperties> enumerate<VkLayerProperties>(){
+	return enumerateScheme<VkLayerProperties>( vkEnumerateInstanceLayerProperties, "vkEnumerateInstanceLayerProperties" );
 }
 
+// for vkEnumerateDeviceLayerProperties -- auto v = enumerate<VkLayerProperties>( pd );
+template<>
+std::vector<VkLayerProperties> enumerate<VkLayerProperties>( VkPhysicalDevice physicalDevice ){
+	using namespace std::placeholders;
+	const auto adapterCmd = std::bind( vkEnumerateDeviceLayerProperties, physicalDevice, _1, _2 );
 
-// scheme adaptor for 4 parameter Vulkan enumerations [dispatch, source, count, out array]
-//
-// e.g. for vkGetPhysicalDeviceSurfaceFormatsKHR( VkPhysicalDevice, VkSurfaceKHR, uint32_t*, VkSurfaceFormatKHR* );
-// vkGetPhysicalDeviceSurfaceFormatsKHR being the Cmd cmd, the physdevice being the Dispatch d, and the surface being the Source s
-// usage: vector<VkSurfaceFormatKHR> sfs = enumerate( vkGetPhysicalDeviceSurfaceFormatsKHR, instance, surface, "vkGetPhysicalDeviceSurfaceFormatsKHR" );
-template<
-	typename Cmd,
-	typename Dispatch,
-	typename Source
->
-decltype(auto) enumerate( Cmd cmd, Dispatch d, Source s, const char* cmdName ){
-	using ElementArray = function_param_t< Cmd, 3 >; // i.e. the 4th parameter type of the cmd
-
-	std::function<  VkResult( uint32_t*, ElementArray )  > adapted_cmd = std::bind(
-		cmd,
-		d,
-		s,
-		std::placeholders::_1,
-		std::placeholders::_2
-	);
-
-	return enumerate( adapted_cmd, cmdName );
+	return enumerateScheme<VkLayerProperties>( adapterCmd, "vkEnumerateDeviceLayerProperties" );
 }
 
+// for vkEnumerateInstanceExtensionProperties -- auto v = enumerate<VkExtensionProperties>( "ln" );
+template<>
+std::vector<VkExtensionProperties> enumerate<VkExtensionProperties>( const char* pLayerName ){
+	using namespace std::placeholders;
+	const auto adapterCmd = std::bind( vkEnumerateInstanceExtensionProperties, pLayerName, _1, _2 );
+
+	return enumerateScheme<VkExtensionProperties>( adapterCmd, "vkEnumerateInstanceExtensionProperties" );
+}
+
+// for vkEnumerateInstanceExtensionProperties with nullptr layer -- auto v = enumerate<VkExtensionProperties>();
+template<>
+std::vector<VkExtensionProperties> enumerate<VkExtensionProperties>(){
+	using namespace std::placeholders;
+	const auto adapterCmd = std::bind( vkEnumerateInstanceExtensionProperties, nullptr, _1, _2 );
+
+	return enumerateScheme<VkExtensionProperties>( adapterCmd, "vkEnumerateInstanceExtensionProperties" );
+}
+
+// for vkEnumerateDeviceExtensionProperties -- auto v = enumerate<VkExtensionProperties>( pd, "ln" );
+template<>
+std::vector<VkExtensionProperties> enumerate<VkExtensionProperties>( VkPhysicalDevice physicalDevice, const char* pLayerName ){
+	using namespace std::placeholders;
+	const auto adapterCmd = std::bind( vkEnumerateDeviceExtensionProperties, physicalDevice, pLayerName, _1, _2 );
+
+	return enumerateScheme<VkExtensionProperties>( adapterCmd, "vkEnumerateDeviceExtensionProperties" );
+}
+
+// for vkEnumerateInstanceExtensionProperties with nullptr layer -- auto v = enumerate<VkExtensionProperties>( pd );
+template<>
+std::vector<VkExtensionProperties> enumerate<VkExtensionProperties>( VkPhysicalDevice physicalDevice ){
+	using namespace std::placeholders;
+	const auto adapterCmd = std::bind( vkEnumerateDeviceExtensionProperties, physicalDevice, nullptr, _1, _2 );
+
+	return enumerateScheme<VkExtensionProperties>( adapterCmd, "vkEnumerateDeviceExtensionProperties" );
+}
+
+// for vkEnumeratePhysicalDevices -- auto v = enumerate<VkPhysicalDevice>( i );
+template<>
+std::vector<VkPhysicalDevice> enumerate<VkPhysicalDevice>( VkInstance instance ){
+	using namespace std::placeholders;
+	const auto adapterCmd = std::bind( vkEnumeratePhysicalDevices, instance, _1, _2 );
+
+	return enumerateScheme<VkPhysicalDevice>( adapterCmd, "vkEnumeratePhysicalDevices" );
+}
+
+// for vkGetPhysicalDeviceSurfaceFormatsKHR -- auto v = enumerate<VkSurfaceFormatKHR>( pd, s );
+template<>
+std::vector<VkSurfaceFormatKHR> enumerate<VkSurfaceFormatKHR>( VkPhysicalDevice physicalDevice, VkSurfaceKHR surface ){
+	using namespace std::placeholders;
+	const auto adapterCmd = std::bind( vkGetPhysicalDeviceSurfaceFormatsKHR, physicalDevice, surface, _1, _2 );
+
+	return enumerateScheme<VkSurfaceFormatKHR>( adapterCmd, "vkGetPhysicalDeviceSurfaceFormatsKHR" );
+}
+
+// for vkGetPhysicalDeviceSurfacePresentModesKHR -- auto v = enumerate<VkSurfaceFormatKHR>( pd, s );
+template<>
+std::vector<VkPresentModeKHR> enumerate<VkPresentModeKHR>( VkPhysicalDevice physicalDevice, VkSurfaceKHR surface ){
+	using namespace std::placeholders;
+	const auto adapterCmd = std::bind( vkGetPhysicalDeviceSurfacePresentModesKHR, physicalDevice, surface, _1, _2 );
+
+	return enumerateScheme<VkPresentModeKHR>( adapterCmd, "vkGetPhysicalDeviceSurfacePresentModesKHR" );
+}
+
+// for vkGetSwapchainImagesKHR -- auto v = enumerate<VkSurfaceFormatKHR>( d, s );
+template<>
+std::vector<VkImage> enumerate<VkImage>( VkDevice device, VkSwapchainKHR swapchain ){
+	using namespace std::placeholders;
+	const auto adapterCmd = std::bind( vkGetSwapchainImagesKHR, device, swapchain, _1, _2 );
+
+	return enumerateScheme<VkImage>( adapterCmd, "vkGetSwapchainImagesKHR" );
+}
+
+// ... others to be added as needed
 
 #endif //ENUMERATE_SCHEME_H
