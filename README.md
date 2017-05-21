@@ -70,7 +70,6 @@ Files
 | xlibPlatform.h | WSI XLIB platform-dependent stuff |
 | Vertex.h | Just simple Vertex definitions |
 | EnumerateScheme.h | A scheme to unify usage of most Vulkan `vkEnumerate*` and `vkGet*` commands |
-| to_string.h | Workaround for broken Standard C++ library in MinGW |
 | ExtensionLoader.h | Functions handling loading of Vulkan extension commands |
 | triangle.vert | The vertex shader program in GLSL |
 | triangle.frag | The fragment shader program in GLSL |
@@ -108,7 +107,7 @@ In Cygwin you can build it e.g. thusly (for x64):
 
 In MinGW like so:
 
-    $ g++ -std=c++14 -Wall -m32 -mwindows -Wl,--subsystem,console -D_DEBUG -I$VULKAN_SDK/Include -oHelloTriangle HelloTriangle.cpp -L$VULKAN_SDK/Bin32 -lvulkan-1 -L/path/to/GLFW/ -lglfw3
+    $ g++ -std=c++14 -Wall -m32 -mwindows -Wl,--subsystem,console -Wl,--allow-multiple-definition -D_DEBUG -I$VULKAN_SDK/Include -I/path/to/GLFW/ -oHelloTriangle HelloTriangle.cpp -L$VULKAN_SDK/Lib32 -lvulkan-1 -L/path/to/GLFW/ -lglfw3
 
 In MS Visual Studio you can create Solution for it.  
 You would add `$(VULKAN_SDK)\Include` to the the Additional Include Directories
@@ -118,7 +117,7 @@ subsystem in SubSystem property.
 
 In Linux distro you would do e.g.:
 
-    $ g++ --std=c++14 -Wall -m64 -D_DEBUG -I$VULKAN_SDK/include -oHelloTriangle HelloTriangle.cpp -L$VULKAN_SDK/lib -lglfw3
+    $ g++ --std=c++14 -Wall -m64 -D_DEBUG -DNO_TODO -I$VULKAN_SDK/include -oHelloTriangle HelloTriangle.cpp -ldl -L$VULKAN_SDK/lib -lvulkan -lglfw
 
 There are annoying (on purpose) TODOs generated on build. They can be disabled
 by defining `NO_TODO`.

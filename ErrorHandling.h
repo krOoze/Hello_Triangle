@@ -9,8 +9,6 @@
 
 #include <vulkan/vulkan.h>
 
-#include "to_string.h"
-
 #include "CompilerMessages.h"
 
 struct VulkanResultException{

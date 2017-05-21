@@ -16,6 +16,7 @@ using std::vector;
 #include<cstring>
 #include <string>
 using std::string;
+using std::to_string;
 
 #include <exception>
 #include <stdexcept>
@@ -36,7 +37,6 @@ using std::runtime_error;
 	#error Update your SDK! This app is written against Vulkan header version 46
 #endif
 
-#include "to_string.h"
 #include "ErrorHandling.h"
 #include "Vertex.h"
 #include "EnumerateScheme.h"
@@ -696,16 +696,17 @@ VkDevice initDevice(
 	checkDeviceExtensionSupport( physDevice, extensions, layers );
 
 	const float priority[] = {1.0f};
-	const VkDeviceQueueCreateInfo qci{
-		VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
-		nullptr, // pNext
-		0, // flags
-		queueFamilyIndex,
-		1, // queue count
-		priority
-	};
 
-	const vector<VkDeviceQueueCreateInfo> queues = { qci };
+	const vector<VkDeviceQueueCreateInfo> queues = {
+		{
+			VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
+			nullptr, // pNext
+			0, // flags
+			queueFamilyIndex,
+			1, // queue count
+			priority
+		}
+	};
 
 	const VkDeviceCreateInfo deviceInfo{
 		VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
