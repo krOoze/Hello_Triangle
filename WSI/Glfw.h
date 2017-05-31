@@ -13,6 +13,7 @@
 #include <GLFW/glfw3.h>
 
 #include "CompilerMessages.h"
+#include "ErrorHandling.h"
 
 
 TODO( "Easier to use, but might prevent platform co-existence. Could be namespaced. Make all of this a class?" )

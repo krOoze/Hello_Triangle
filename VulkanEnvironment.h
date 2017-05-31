@@ -27,9 +27,10 @@
 
 #if defined(_WIN32)
 	#define USE_PLATFORM_GLFW
-	//#define VK_USE_PLATFORM_WIN32_KHR
-	#define _CRT_SECURE_NO_WARNINGS
-	//#include "LeanWindowsEnvironment.h" // Windows.h settings must be first -- vulkan.h does include Windows.h
+	#if defined(_WIN32) && !defined(_CONSOLE)
+		#include "LeanWindowsEnvironment.h"
+		#include <Windows.h>
+	#endif
 #elif defined(__CYGWIN__)
 	#define VK_USE_PLATFORM_WIN32_KHR
 	#include "LeanWindowsEnvironment.h" // Windows.h settings must be first -- vulkan.h does include Windows.h

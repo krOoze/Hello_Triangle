@@ -10,10 +10,11 @@
 // Includes
 //////////////////////////////////////////////////////////////////////////////////
 
+#include <cstdlib>
+
 #include <vector>
 using std::vector;
 
-#include<cstring>
 #include <string>
 using std::string;
 using std::to_string;
@@ -33,26 +34,16 @@ using std::runtime_error;
 #include <cassert>
 
 #include <vulkan/vulkan.h> // + assume core+WSI is loaded
-#if VK_HEADER_VERSION < 46
-	#error Update your SDK! This app is written against Vulkan header version 46
+#if VK_HEADER_VERSION < 49
+	#error Update your SDK! This app is written against Vulkan header version 49
 #endif
+
+#include "Wsi.h"
 
 #include "ErrorHandling.h"
 #include "Vertex.h"
 #include "EnumerateScheme.h"
 #include "ExtensionLoader.h"
-
-#if defined(USE_PLATFORM_GLFW)
-	#include "glfwPlatform.h"
-#elif defined(VK_USE_PLATFORM_WIN32_KHR)
-	#include "win32Platform.h"
-#elif defined(VK_USE_PLATFORM_XLIB_KHR)
-	#include "xlibPlatform.h"
-#elif defined(VK_USE_PLATFORM_XCB_KHR)
-	#include "xcbPlatform.h"
-#else
-	#error "Unsupported Vulkan WSI platform."
-#endif
 
 
 // Config
@@ -227,7 +218,7 @@ void present( VkQueue queue, VkSwapchainKHR swapchain, uint32_t swapchainImageIn
 // main()!
 //////////////////////////////////////////////////////////////////////////////////
 
-int main() try{
+int helloTriangle() try{
 	const uint32_t vertexBufferBinding = 0;
 
 	const float triangleSize = 1.6f;
@@ -402,7 +393,7 @@ int main() try{
 
 	// Finally start the main message loop (and so render too)
 	showWindow( window );
-	int ret = messageLoop( window );
+	int exitStatus = messageLoop( window );
 
 
 	// proper Vulkan cleanup
@@ -441,26 +432,46 @@ int main() try{
 #endif
 	killInstance( instance );
 
-	return ret;
+	return exitStatus;
 }
 catch( VulkanResultException vkE ){
 	logger << "ERROR: Terminated due to an uncaught VkResult exception: "
-	    << vkE.file << ":" << vkE.line << ":" << vkE.func << "() " << vkE.source << "() returned " << to_string( vkE.result )
-	    << std::endl;
+	       << vkE.file << ":" << vkE.line << ":" << vkE.func << "() " << vkE.source << "() returned " << to_string( vkE.result )
+	       << std::endl;
+	return EXIT_FAILURE;
 }
 catch( const char* e ){
 	logger << "ERROR: Terminated due to an uncaught exception: " << e << std::endl;
+	return EXIT_FAILURE;
 }
 catch( string e ){
 	logger << "ERROR: Terminated due to an uncaught exception: " << e << std::endl;
+	return EXIT_FAILURE;
 }
 catch( std::exception e ){
 	logger << "ERROR: Terminated due to an uncaught exception: " << e.what() << std::endl;
+	return EXIT_FAILURE;
 }
 catch( ... ){
 	logger << "ERROR: Terminated due to an unrecognized uncaught exception." << std::endl;
+	return EXIT_FAILURE;
 }
 
+
+#if defined(_WIN32) && !defined(_CONSOLE)
+int WINAPI wWinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine, int nCmdShow ){
+	UNREFERENCED_PARAMETER( hInstance );
+	UNREFERENCED_PARAMETER( hPrevInstance );
+	UNREFERENCED_PARAMETER( pCmdLine );
+	UNREFERENCED_PARAMETER( nCmdShow );
+
+	return helloTriangle();
+}
+#else
+int main(){
+	return helloTriangle();
+}
+#endif
 
 // Implementation
 //////////////////////////////////////////////////////////////////////////////////
@@ -1203,8 +1214,9 @@ VkShaderModule initShaderModule( VkDevice device, string filename ){
 
 	//using Fs = basic_ifstream<uint32_t>;
 	using Fs = ifstream;
-	Fs ifs( filename, Fs::in | Fs::binary );
-	if( !ifs.is_open() ) throw string( "SPIR-V shader file failed to open: " ) + strerror( errno );
+	Fs ifs;
+	ifs.exceptions( ifstream::failbit | ifstream::badbit | ifstream::eofbit );
+	ifs.open( filename, Fs::in | Fs::binary );
 	vector<char> shaderCode( (istreambuf_iterator<char>(ifs)), istreambuf_iterator<char>() /* EOS */ ); // Most Vexing Parse
 
 	if( shaderCode.empty() || shaderCode.size() % 4 != 0 /* per spec; % sizeof(uint32_t) presumably */ ){

@@ -64,10 +64,11 @@ Files
 | LeanWindowsEnvironment.h | Included conditionally by `VulkanEnvironment.h` and includes lean `windows.h` header |
 | CompilerMessages.h | Allows to make compile-time messages shown in the compiler output |
 | ErrorHandling.h | `VkResult` check helpers + `VK_EXT_debug_report` extension related stuff |
-| glfwPlatform.h | WSI platform-dependent stuff via GLFW3 library |
-| win32Platform.h | WSI Win32 platform-dependent stuff |
-| xcbPlatform.h | WSI XCB platform-dependent stuff |
-| xlibPlatform.h | WSI XLIB platform-dependent stuff |
+| WSI/Glfw.h | WSI platform-dependent stuff via GLFW3 library |
+| WSI/Win32.h | WSI Win32 platform-dependent stuff |
+| WSI/Xcb.h | WSI XCB platform-dependent stuff |
+| WSI/Xlib.h | WSI XLIB platform-dependent stuff |
+| Wsi.h | Meta-header choosing one of the platform in WSI directory |
 | Vertex.h | Just simple Vertex definitions |
 | EnumerateScheme.h | A scheme to unify usage of most Vulkan `vkEnumerate*` and `vkGet*` commands |
 | ExtensionLoader.h | Functions handling loading of Vulkan extension commands |
@@ -103,11 +104,11 @@ Build
 
 In Cygwin you can build it e.g. thusly (for x64):
 
-    $ g++ -std=c++14 -Wall -m64 -mwindows -Wl,--subsystem,console -D_DEBUG -I$VULKAN_SDK/Include -oHelloTriangle HelloTriangle.cpp -L$WINDIR/System32 -lvulkan-1
+    $ g++ -std=c++14 -Wall -m64 -mwindows -Wl,--subsystem,console -D_DEBUG -I./ -I$VULKAN_SDK/Include -oHelloTriangle HelloTriangle.cpp -L$WINDIR/System32 -lvulkan-1
 
 In MinGW like so:
 
-    $ g++ -std=c++14 -Wall -m32 -mwindows -Wl,--subsystem,console -Wl,--allow-multiple-definition -D_DEBUG -I$VULKAN_SDK/Include -I/path/to/GLFW/ -oHelloTriangle HelloTriangle.cpp -L$VULKAN_SDK/Lib32 -lvulkan-1 -L/path/to/GLFW/ -lglfw3
+    $ g++ -std=c++14 -Wall -m32 -mwindows -Wl,--subsystem,console -Wl,--allow-multiple-definition -D_DEBUG -I./ -I$VULKAN_SDK/Include -I/path/to/GLFW/ -oHelloTriangle HelloTriangle.cpp -L$VULKAN_SDK/Lib32 -lvulkan-1 -L/path/to/GLFW/ -lglfw3
 
 In MS Visual Studio you can create Solution for it.  
 You would add `$(VULKAN_SDK)\Include` to the the Additional Include Directories

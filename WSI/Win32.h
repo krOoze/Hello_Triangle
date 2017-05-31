@@ -10,6 +10,7 @@
 #include <vulkan/vulkan.h>
 
 #include "CompilerMessages.h"
+#include "ErrorHandling.h"
 
 
 TODO( "Easier to use, but might prevent platform co-existence. Could be namespaced. Make all of this a class?" )
@@ -31,17 +32,6 @@ void setSizeEventHandler( std::function<void(void)> newSizeEventHandler );
 void setPaintEventHandler( std::function<void(void)> newPaintEventHandler );
 
 void showWindow( PlatformWindow window );
-
-// In case of non console subsystem just relay to main()
-int main();
-int WINAPI wWinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine, int nCmdShow ){
-	UNREFERENCED_PARAMETER( hInstance );
-	UNREFERENCED_PARAMETER( hPrevInstance );
-	UNREFERENCED_PARAMETER( pCmdLine );
-	UNREFERENCED_PARAMETER( nCmdShow );
-
-	return main();
-}
 
 // Implementation
 //////////////////////////////////
