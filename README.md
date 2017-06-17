@@ -75,7 +75,8 @@ Files
 | triangle.vert | The vertex shader program in GLSL |
 | triangle.frag | The fragment shader program in GLSL |
 | triangle.vert.spv | triangle.vert pre-transcripted to SPIR-V for convenience |
-| triangle.frag.spv |  triangle.frag pre-transcripted to SPIR-V for convenience |
+| triangle.frag.spv | triangle.frag pre-transcripted to SPIR-V for convenience |
+| CMakeLists.txt | CMake makefile |
 
 Config
 ---------------------------------------
@@ -101,6 +102,10 @@ dangerous to the PCB).
 
 Build
 ----------------------------------------------
+
+In many cases CMake style build should work just fine:
+
+    $ cmake -G"Your generator"
 
 In Cygwin you can build it e.g. thusly (for x64):
 
