@@ -913,13 +913,11 @@ VkImageView initImageView( VkDevice device, VkImage image, VkFormat format ){
 		{
 			VK_IMAGE_ASPECT_COLOR_BIT,
 			0, // base mip-level
-			1, //VK_REMAINING_MIP_LEVELS, // level count
+			VK_REMAINING_MIP_LEVELS, // level count
 			0, // base array layer
-			1 //VK_REMAINING_ARRAY_LAYERS // array layer count
+			VK_REMAINING_ARRAY_LAYERS // array layer count
 		}
 	};
-
-	TODO( "Workaround for bad layers and VK_REMAINING_* (again). Fix already in master; unfortunatelly too late for 1.0.49 SDK." )
 
 	VkImageView imageView;
 	VkResult errorCode = vkCreateImageView( device, &iciv, nullptr, &imageView ); RESULT_HANDLER( errorCode, "vkCreateImageView" );
