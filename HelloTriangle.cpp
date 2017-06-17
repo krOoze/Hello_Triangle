@@ -1210,15 +1210,20 @@ VkShaderModule initShaderModule( VkDevice device, string filename ){
 	using std::ifstream;
 	using std::istreambuf_iterator;
 
-	//using Fs = basic_ifstream<uint32_t>;
-	using Fs = ifstream;
-	Fs ifs;
-	ifs.exceptions( ifstream::failbit | ifstream::badbit | ifstream::eofbit );
-	ifs.open( filename, Fs::in | Fs::binary );
-	vector<char> shaderCode( (istreambuf_iterator<char>(ifs)), istreambuf_iterator<char>() /* EOS */ ); // Most Vexing Parse
+	vector<char> shaderCode;
+
+	try{
+		ifstream ifs;
+		ifs.exceptions( ifstream::failbit | ifstream::badbit | ifstream::eofbit );
+		ifs.open( filename, ifstream::in | ifstream::binary );
+		shaderCode.assign( (istreambuf_iterator<char>(ifs)), istreambuf_iterator<char>() /* EOS */ ); // Most Vexing Parse
+	}
+	catch( ... ){
+		shaderCode.clear();
+	}
 
 	if( shaderCode.empty() || shaderCode.size() % 4 != 0 /* per spec; % sizeof(uint32_t) presumably */ ){
-		throw "SPIR-V shader file is invalid or read failed!";
+		throw "SPIR-V shader file " + filename + " is invalid or read failed!";
 	}
 
 	VkShaderModuleCreateInfo shaderModuleInfo{
