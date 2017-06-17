@@ -176,7 +176,8 @@ VkPipeline initPipeline(
 	VkRenderPass renderPass,
 	VkShaderModule vertexShader,
 	VkShaderModule fragmentShader,
-	const uint32_t vertexBufferBinding
+	const uint32_t vertexBufferBinding,
+	uint32_t width, uint32_t height
 );
 void killPipeline( VkDevice device, VkPipeline pipeline );
 
@@ -204,9 +205,6 @@ void recordEndRenderPass( VkCommandBuffer commandBuffer );
 
 void recordBindPipeline( VkCommandBuffer commandBuffer, VkPipeline pipeline );
 void recordBindVertexBuffer( VkCommandBuffer commandBuffer, const uint32_t vertexBufferBinding, VkBuffer vertexBuffer );
-
-void recordSetViewport( VkCommandBuffer commandBuffer, uint32_t width, uint32_t height );
-void recordSetScissor( VkCommandBuffer commandBuffer, uint32_t width, uint32_t height );
 
 void recordDraw( VkCommandBuffer commandBuffer, const vector<Vertex2D_ColorF_pack> vertices );
 
@@ -279,15 +277,6 @@ int helloTriangle() try{
 	VkShaderModule vertexShader = initShaderModule( device, ::vertexShaderFilename );
 	VkShaderModule fragmentShader = initShaderModule( device, ::fragmentShaderFilename );
 	VkPipelineLayout pipelineLayout = initPipelineLayout( device );
-	VkPipeline pipeline = initPipeline(
-		device,
-		physicalDeviceProperties.limits,
-		pipelineLayout,
-		renderPass,
-		vertexShader,
-		fragmentShader,
-		vertexBufferBinding
-	);
 
 	VkBuffer vertexBuffer = initBuffer( device, sizeof( decltype( triangle )::value_type ) * triangle.size(), VK_BUFFER_USAGE_VERTEX_BUFFER_BIT );
 	VkDeviceMemory vertexBufferMemory = initMemory<ResourceType::Buffer>(
@@ -310,6 +299,7 @@ int helloTriangle() try{
 	vector<VkImageView> swapchainImageViews;
 	vector<VkFramebuffer> framebuffers;
 
+	VkPipeline pipeline = VK_NULL_HANDLE;
 	vector<VkCommandBuffer> commandBuffers;
 
 	VkSemaphore imageReadyS = VK_NULL_HANDLE;
@@ -328,7 +318,9 @@ int helloTriangle() try{
 		killSemaphore( device, renderDoneS );
 		killFramebuffers( device, framebuffers );
 		killSwapchainImageViews( device, swapchainImageViews );
-		killSwapchain( device, swapchain ); swapchain = VK_NULL_HANDLE; 
+		killSwapchain( device, swapchain ); swapchain = VK_NULL_HANDLE;
+
+		killPipeline( device, pipeline );
 
 		// recreation
 		VkSurfaceCapabilitiesKHR capabilities = getSurfaceCapabilities( physicalDevice, surface );
@@ -343,6 +335,17 @@ int helloTriangle() try{
 		swapchainImageViews = initSwapchainImageViews( device, swapchainImages, surfaceFormat.format );
 		framebuffers = initFramebuffers( device, renderPass, swapchainImageViews, surfaceSize.width, surfaceSize.height );
 
+		pipeline = initPipeline(
+			device,
+			physicalDeviceProperties.limits,
+			pipelineLayout,
+			renderPass,
+			vertexShader,
+			fragmentShader,
+			vertexBufferBinding,
+			surfaceSize.width, surfaceSize.height
+		);
+
 		acquireCommandBuffers(  device, commandPool, static_cast<uint32_t>( swapchainImages.size() ), commandBuffers  );
 		for( size_t i = 0; i < swapchainImages.size(); ++i ){
 			beginCommandBuffer( commandBuffers[i] );
@@ -350,9 +353,6 @@ int helloTriangle() try{
 
 				recordBindPipeline( commandBuffers[i], pipeline );
 				recordBindVertexBuffer( commandBuffers[i], vertexBufferBinding, vertexBuffer );
-
-				recordSetViewport( commandBuffers[i], surfaceSize.width, surfaceSize.height );
-				recordSetScissor( commandBuffers[i], surfaceSize.width, surfaceSize.height );
 
 				recordDraw( commandBuffers[i], triangle );
 
@@ -409,13 +409,14 @@ int helloTriangle() try{
 	killSwapchainImageViews( device, swapchainImageViews );
 	killSwapchain( device, swapchain );
 
+	killPipeline( device, pipeline );
+
 	// kill vulkan
 	killCommandPool( device,  commandPool );
 
 	killMemory( device, vertexBufferMemory );
 	killBuffer( device, vertexBuffer );
 
-	killPipeline( device, pipeline );
 	killPipelineLayout( device, pipelineLayout );
 	killShaderModule( device, fragmentShader );
 	killShaderModule( device, vertexShader );
@@ -1273,7 +1274,8 @@ VkPipeline initPipeline(
 	VkRenderPass renderPass,
 	VkShaderModule vertexShader,
 	VkShaderModule fragmentShader,
-	const uint32_t vertexBufferBinding
+	const uint32_t vertexBufferBinding,
+	uint32_t width, uint32_t height
 ){/*
 	const VkPipelineShaderStageCreateInfo vertexShaderStage{
 		VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
@@ -1387,14 +1389,28 @@ VkPipeline initPipeline(
 		VK_FALSE // primitive restart
 	};
 
+	VkViewport viewport{
+		0.0f, // x
+		0.0f, // y
+		static_cast<float>( width ? width : 1 ),
+		static_cast<float>( height ? height : 1 ),
+		0.0f, // min depth
+		1.0f // max depth
+	};
+
+	VkRect2D scissor{
+		{0, 0}, // offset
+		{width, height}
+	};
+
 	VkPipelineViewportStateCreateInfo viewportState{
 		VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO,
 		nullptr, // pNext
 		0, // flags - reserved for future use
 		1, // Viewport count
-		nullptr, // vieports - ignored for dynamic viewport
+		&viewport,
 		1, // scisor count,
-		nullptr // scisors - ignored for dynamic scisors
+		&scissor
 	};
 
 	VkPipelineRasterizationStateCreateInfo rasterizationState{
@@ -1447,15 +1463,6 @@ VkPipeline initPipeline(
 		{0.0f, 0.0f, 0.0f, 0.0f} // blend constants
 	};
 
-	vector<VkDynamicState> dynamicObjects = { VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR };
-	VkPipelineDynamicStateCreateInfo dynamicState{
-		VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO,
-		nullptr, // pNext
-		0, // flags - reserved for future use
-		static_cast<uint32_t>( dynamicObjects.size() ),
-		dynamicObjects.data()
-	};
-
 	VkGraphicsPipelineCreateInfo pipelineInfo{
 		VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
 		nullptr, // pNext
@@ -1470,7 +1477,7 @@ VkPipeline initPipeline(
 		&multisampleState,
 		nullptr, // depth stencil
 		&colorBlendState,
-		&dynamicState, // dynamic state
+		nullptr, // dynamic state
 		pipelineLayout,
 		renderPass,
 		0, // subpass index in renderpass
@@ -1599,31 +1606,6 @@ void recordBindPipeline( VkCommandBuffer commandBuffer, VkPipeline pipeline ){
 void recordBindVertexBuffer( VkCommandBuffer commandBuffer, const uint32_t vertexBufferBinding, VkBuffer vertexBuffer ){
 	VkDeviceSize offsets[] = {0};
 	vkCmdBindVertexBuffers( commandBuffer, vertexBufferBinding, 1 /*binding count*/, &vertexBuffer, offsets );
-}
-
-void recordSetViewport( VkCommandBuffer commandBuffer, uint32_t width, uint32_t height ){
-	if( width == 0 ) width = 1;
-	if( height == 0 ) height = 1;
-
-	VkViewport viewport{
-		0.0f, // x
-		0.0f, // y
-		(float)width,
-		(float)height,
-		0.0f, // min depth
-		1.0f // max depth
-	};
-
-	vkCmdSetViewport( commandBuffer, 0 /*first*/, 1 /*count*/, &viewport );
-}
-
-void recordSetScissor( VkCommandBuffer commandBuffer, uint32_t width, uint32_t height ){
-	VkRect2D scissor{
-		{0, 0}, // offset
-		{width, height}
-	};
-
-	vkCmdSetScissor( commandBuffer, 0 /*first*/, 1 /*count*/, &scissor );
 }
 
 void recordDraw( VkCommandBuffer commandBuffer, const vector<Vertex2D_ColorF_pack> vertices ){
