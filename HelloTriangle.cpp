@@ -34,7 +34,7 @@ using std::runtime_error;
 #include <cassert>
 
 #include <vulkan/vulkan.h> // + assume core+WSI is loaded
-#if VK_HEADER_VERSION < 49
+#if VK_HEADER_VERSION < 54
 	#error Update your SDK! This app is written against Vulkan header version 49
 #endif
 

@@ -15,9 +15,6 @@ perfectly adhere to the Vulkan spec e.g. it should do proper synchronization and
 do so in efficient way (as it was meant to be used). Well, at least that is the
 goal (to have at least for this elementary case a flawless application).
 
- - TODO: check limits
- - TODO: make vertex buffer in best memory + investigate device memory alignment
-
 Branches
 -----------------
 
@@ -47,12 +44,12 @@ Requirements
 **Environment**: installed (latest) LunarG SDK  
 **Environment**: preferably installed (latest) Vulkan capable drivers  
 **Environment**: On Windows MS Visual Studio, Cygwin, MinGW (or IDEs running on top of
-them)   
+them)  
 **Environment**: On Linux g++ and libxcb-dev and libxcb-keysyms-dev  
-**Environment[Optional]**: Optionally GLFW 3.2+
+**Environment[Optional]**: Optionally GLFW 3.2+ (included as a git submodule)
 
-TODO: Adding VkSurface function for other OSes should be straightforward though
-using the provided ones as template for it.
+Adding `VkSurface` support for other OSes should be straightforward using the
+provided ones as a template for it.
 
 Files
 ----------------------------------
