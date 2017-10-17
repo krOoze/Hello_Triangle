@@ -1,27 +1,28 @@
 Hello Triangle Vulkan demo
 =========================
 
-This is a traditional Hello World style application for graphical APIs (for
-Vulkan in this case). It renders a RGB shaded equilateral triangle (well, if the
-resolution is a square).
+This is a traditional Hello World style application for graphical Vulkan.
+It renders a RGB shaded equilateral triangle (well, if the resolution is a
+square).
 
 The code is quite flat and basic, so I think it's good enough for learning. No
 tutorial or even much comments are provided though (comments do lie anyway
 :smirk:).
 
 But I have tried not to cut corners making it. It contains proper error handling
-and I assume it is without errors :innocent:. It should
-perfectly adhere to the Vulkan spec e.g. it should do proper synchronization and
-do so in efficient way (as it was meant to be used). Well, at least that is the
-goal (to have at least for this elementary case a flawless application).
+and I assume it is without errors :innocent:. It should perfectly adhere to the
+Vulkan specification &mdash; e.g. it should do proper synchronization and do so
+in reasonably efficient way (as it was meant to be used). Well, at least that is
+the goal (i.e to have at least for this elementary case a flawless enough
+application).
 
 Branches
 -----------------
 
-The git branches demonstrate some elementary Vulkan techniques which can be
-easily grafted on this basic example (it is nice to see a diff of what needs
-to be changed for it to work). Their `README.md` should be edited to reflect
-the changes.
+The git branches demonstrate some basic Vulkan features which can be easily
+grafted on this basic example (it is nice to see a diff of what exactly needs to
+be changed to make it work). Their `README.md` should be edited to reflect the
+changes.
 
 | branch | description |
 |---|---|
@@ -33,47 +34,54 @@ Proper renderloop synchronization mini-tutorial
 -------------------------------------
 
 Well, people tend to ask this one over and over, so I will make an exception to
-the no tutorial policy above :wink::
-[synchronizationTutorial.md](synchronizationTutorial.md).
+the "no tutorial" policy above :wink::
+[doc/synchronizationTutorial.md](doc/synchronizationTutorial.md).
 
 Requirements
 ----------------------------
 
 **OS**: Windows or Linux  
 **Language**: C++14  
-**Environment**: installed (latest) LunarG SDK  
-**Environment**: preferably installed (latest) Vulkan capable drivers  
-**Environment**: On Windows MS Visual Studio, Cygwin, MinGW (or IDEs running on top of
-them)  
-**Environment**: On Linux g++ and libxcb-dev and libxcb-keysyms-dev  
-**Environment[Optional]**: Optionally GLFW 3.2+ (included as a git submodule)
+**Build environment**: installed (latest) LunarG SDK  
+**Build environment**: On Windows MS Visual Studio, Cygwin, MinGW (or IDEs running on top of them)  
+**Build environment**: On Linux g++ and libxcb-dev and libxcb-keysyms-dev  
+**Build Environment[Optional]**: GLFW 3.2+ (included as a git submodule)  
+**Target Environment**: installed (latest) Vulkan capable drivers (to see anything)  
+**Target Environment**: GLFW(recommended), XCB or Xlib based windowing system
 
-Adding `VkSurface` support for other OSes should be straightforward using the
-provided ones as a template for it.
+On Unix-like environment refer to [SDK docs](https://vulkan.lunarg.com/doc/sdk/latest/linux/getting_started.html) on how to set `VULKAN_SDK` variable.
+
+Adding `VkSurface` support for other platforms should be straightforward using
+the provided ones as a template for it.
 
 Files
 ----------------------------------
 
 | file | description |
 |---|---|
-| HelloTriangle.cpp | The app souce code including `main` function |
-| VulkanEnvironment.h | Includes `vulkan.h` and the necessary platform headers |
-| LeanWindowsEnvironment.h | Included conditionally by `VulkanEnvironment.h` and includes lean `windows.h` header |
-| CompilerMessages.h | Allows to make compile-time messages shown in the compiler output |
-| ErrorHandling.h | `VkResult` check helpers + `VK_EXT_debug_report` extension related stuff |
-| WSI/Glfw.h | WSI platform-dependent stuff via GLFW3 library |
-| WSI/Win32.h | WSI Win32 platform-dependent stuff |
-| WSI/Xcb.h | WSI XCB platform-dependent stuff |
-| WSI/Xlib.h | WSI XLIB platform-dependent stuff |
-| Wsi.h | Meta-header choosing one of the platform in WSI directory |
-| Vertex.h | Just simple Vertex definitions |
-| EnumerateScheme.h | A scheme to unify usage of most Vulkan `vkEnumerate*` and `vkGet*` commands |
-| ExtensionLoader.h | Functions handling loading of Vulkan extension commands |
-| triangle.vert | The vertex shader program in GLSL |
-| triangle.frag | The fragment shader program in GLSL |
-| triangle.vert.spv | triangle.vert pre-transcripted to SPIR-V for convenience |
-| triangle.frag.spv | triangle.frag pre-transcripted to SPIR-V for convenience |
+| [doc/synchronizationTutorial.md](doc/synchronizationTutorial.md) | Short explanation of Vulkan synchronization in the context of trivial applications |
+| external/glfw/ | GLFW git submodule |
+| src/HelloTriangle.cpp | The app souce code including `main` function |
+| src/CompilerMessages.h | Allows to make compile-time messages shown in the compiler output |
+| src/EnumerateScheme.h | A scheme to unify usage of most Vulkan `vkEnumerate*` and `vkGet*` commands |
+| src/ErrorHandling.h | `VkResult` check helpers + `VK_EXT_debug_report` extension related stuff |
+| src/ExtensionLoader.h | Functions handling loading of Vulkan extension commands |
+| src/LeanWindowsEnvironment.h | Included conditionally by `VulkanEnvironment.h` and includes lean `windows.h` header |
+| src/Vertex.h | Just simple Vertex definitions |
+| src/VulkanEnvironment.h | Includes `vulkan.h` and the necessary platform headers |
+| src/Wsi.h | Meta-header choosing one of the platforms in WSI directory |
+| src/WSI/Glfw.h | WSI platform-dependent stuff via GLFW3 library |
+| src/WSI/Win32.h | WSI Win32 platform-dependent stuff |
+| src/WSI/Xcb.h | WSI XCB platform-dependent stuff |
+| src/WSI/Xlib.h | WSI XLIB platform-dependent stuff |
+| src/shaders/hello_triangle.vert | The vertex shader program in GLSL |
+| src/shaders/hello_triangle.frag | The fragment shader program in GLSL |
+| .gitignore | Git filter file ignoring most probably outputs messing the local repo |
+| .gitmodules | Git submodules file describing the dependency on GLFW |
 | CMakeLists.txt | CMake makefile |
+| CONTRIBUTING.md | Extra info about contributing code, ideas and bug reports |
+| LICENSE | Copyright licence for this project |
+| README.md | This file |
 
 Config
 ---------------------------------------
@@ -95,46 +103,56 @@ variables in `HelloTriangle.cpp`.
 
 <sup>1</sup> I preferred `VK_PRESENT_MODE_IMMEDIATE_KHR` before but it tends to
 make coil whine because of the exteme FPS (which could be unnecessarily
-dangerous to the PCB).
+dangerous to the PCB in long term).
 
 Build
 ----------------------------------------------
 
-In many cases CMake style build should work just fine:
+In many platforms CMake style build should work just fine:
 
-    $ cmake -G"Your generator"
+    $ cmake -G"Your preferred generator"
 
-In Cygwin you can build it e.g. thusly (for x64):
+or even just
 
-    $ g++ -std=c++14 -Wall -m64 -mwindows -Wl,--subsystem,console -D_DEBUG -I./ -I$VULKAN_SDK/Include -oHelloTriangle HelloTriangle.cpp -L$WINDIR/System32 -lvulkan-1
+    $ cmake .
 
-In MinGW like so:
+Then use `make`, or the generated Visual Studio `*.sln`, or whatever it created.
 
-    $ g++ -std=c++14 -Wall -m32 -mwindows -Wl,--subsystem,console -Wl,--allow-multiple-definition -D_DEBUG -I./ -I$VULKAN_SDK/Include -I/path/to/GLFW/ -oHelloTriangle HelloTriangle.cpp -L$VULKAN_SDK/Lib32 -lvulkan-1 -L/path/to/GLFW/ -lglfw3
+<hr />
 
-In MS Visual Studio you can create Solution for it.  
-You would add `$(VULKAN_SDK)\Include` to the the Additional Include Directories
-and `$(VULKAN_SDK)\Bin\vulkan-1.lib` (or `Bin32` for x86) and `glfw3.lib` to the
-Additional Dependencies property. You may choose between `windows` or `console`
-subsystem in SubSystem property.
+The code base is quite simple and it can be built manually. It only assumes that
+the `src` folder is in the include path, that you link the GLFW dependency, and
+that you compile the GLSL shader files into SPIR-V.
+
+In Visual Studio you can simply import the code and add things mentioned above.
+Either "console" or "window" subsystem is a valid choice.
 
 In Linux distro you would do e.g.:
 
-    $ g++ --std=c++14 -Wall -m64 -D_DEBUG -DNO_TODO -I$VULKAN_SDK/include -oHelloTriangle HelloTriangle.cpp -ldl -L$VULKAN_SDK/lib -lvulkan -lglfw
+    $ g++ --std=c++14 -Wall -m64 -D_DEBUG -DNO_TODO -I$VULKAN_SDK/include -I./src/ -o./HelloTriangle src/HelloTriangle.cpp -ldl -L$VULKAN_SDK/lib -lvulkan -lglfw
+
+GLSL shaders can be compiled using `glslc` from LunarG Vulkan SDK like so:  
+On Windows-like environment:
+
+    %VULKAN_SDK%/Bin/glslc -mfmt=c -o ./src/shaders/hello_triangle.vert.spv.inl ./src/shaders/hello_triangle.vert
+    %VULKAN_SDK%/Bin/glslc -mfmt=c -o ./src/shaders/hello_triangle.frag.spv.inl ./src/shaders/hello_triangle.frag
+
+Or on Unix-like environment you would use just `$VULKAN_SDK` instead:
+
+    $VULKAN_SDK/Bin/glslc -mfmt=c -o ./src/shaders/hello_triangle.vert.spv.inl ./src/shaders/hello_triangle.vert
+    $VULKAN_SDK/Bin/glslc -mfmt=c -o ./src/shaders/hello_triangle.frag.spv.inl ./src/shaders/hello_triangle.frag
 
 There are annoying (on purpose) TODOs generated on build. They can be disabled
-by defining `NO_TODO`.
+by defining `NO_TODO` preprocessor macro.
 
-Using GLFW is optional. You may choose another windowing platform in
-`VulkanEnvironment.h`. All platforms use GLFW by default except Cygwin (which
+Using GLFW is optional. You may choose another windowing platform by modifying
+`VulkanEnvironment.h`. By default all platforms use GLFW except Cygwin (which
 uses Win32 directly to reduce dependencies on X11).
 
 Run
 ------------------------
 
-You just run it as you would anything else. You just need to make sure
-`triangle.vert.spv` and `triangle.frag.spv` files are visible to the binary
-(e.g. in the same folder).
+You just run it as you would anything else.
 
 <kbd>Esc</kbd> does terminate the app.  
 <kbd>Alt</kbd> + <kbd>Enter</kbd> toggles fullscreen if using GLFW.

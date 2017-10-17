@@ -33,10 +33,8 @@ using std::runtime_error;
 
 #include <cassert>
 
-#include <vulkan/vulkan.h> // + assume core+WSI is loaded
-#if VK_HEADER_VERSION < 54
-	#error Update your SDK! This app is written against Vulkan header version 49
-#endif
+#include <vulkan/vulkan.h> // also assume core+WSI commands are loaded
+static_assert( VK_HEADER_VERSION >= REQUIRED_HEADER_VERSION, "Update your SDK! This app is written against Vulkan header version " STRINGIZE(REQUIRED_HEADER_VERSION) "." );
 
 #include "Wsi.h"
 
@@ -72,9 +70,6 @@ constexpr VkPresentModeKHR presentMode = VK_PRESENT_MODE_FIFO_KHR;
 
 // pipeline settings
 constexpr VkClearValue clearColor = {  { {0.1f, 0.1f, 0.1f, 1.0f} }  };
-
-constexpr char vertexShaderFilename[] = "triangle.vert.spv";
-constexpr char fragmentShaderFilename[] = "triangle.frag.spv";
 
 
 // needed stuff for main() -- forward declarations
@@ -163,6 +158,7 @@ vector<VkFramebuffer> initFramebuffers(
 void killFramebuffers( VkDevice device, vector<VkFramebuffer> framebuffers );
 
 
+VkShaderModule initShaderModule( VkDevice device, const vector<uint32_t>& shaderCode );
 VkShaderModule initShaderModule( VkDevice device, string filename );
 void killShaderModule( VkDevice device, VkShaderModule shaderModule );
 
@@ -274,8 +270,14 @@ int helloTriangle() try{
 	VkSurfaceFormatKHR surfaceFormat = getSurfaceFormat( physicalDevice, surface );
 	VkRenderPass renderPass = initRenderPass( device, surfaceFormat );
 
-	VkShaderModule vertexShader = initShaderModule( device, ::vertexShaderFilename );
-	VkShaderModule fragmentShader = initShaderModule( device, ::fragmentShaderFilename );
+	vector<uint32_t> vertexShaderBinary = 
+#include "shaders/hello_triangle.vert.spv.inl"
+	;
+	vector<uint32_t> fragmentShaderBinary =
+#include "shaders/hello_triangle.frag.spv.inl"
+	;
+	VkShaderModule vertexShader = initShaderModule( device, vertexShaderBinary );
+	VkShaderModule fragmentShader = initShaderModule( device, fragmentShaderBinary );
 	VkPipelineLayout pipelineLayout = initPipelineLayout( device );
 
 	VkBuffer vertexBuffer = initBuffer( device, sizeof( decltype( triangle )::value_type ) * triangle.size(), VK_BUFFER_USAGE_VERTEX_BUFFER_BIT );
@@ -399,7 +401,6 @@ int helloTriangle() try{
 	// proper Vulkan cleanup
 	VkResult errorCode = vkDeviceWaitIdle( device ); RESULT_HANDLER( errorCode, "vkDeviceWaitIdle" );
 
-
 	// kill swapchain
 	killSemaphore( device, imageReadyS );
 	killSemaphore( device, renderDoneS );
@@ -460,12 +461,7 @@ catch( ... ){
 
 
 #if defined(_WIN32) && !defined(_CONSOLE)
-int WINAPI wWinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine, int nCmdShow ){
-	UNREFERENCED_PARAMETER( hInstance );
-	UNREFERENCED_PARAMETER( hPrevInstance );
-	UNREFERENCED_PARAMETER( pCmdLine );
-	UNREFERENCED_PARAMETER( nCmdShow );
-
+int WINAPI WinMain( HINSTANCE, HINSTANCE, LPSTR, int ){
 	return helloTriangle();
 }
 #else
@@ -1207,34 +1203,47 @@ void killFramebuffers( VkDevice device, vector<VkFramebuffer> framebuffers ){
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-VkShaderModule initShaderModule( VkDevice device, string filename ){
+template<typename Type = uint8_t>
+vector<Type> loadBinaryFile( string filename ){
 	using std::ifstream;
 	using std::istreambuf_iterator;
 
-	vector<char> shaderCode;
+	vector<Type> data;
 
 	try{
 		ifstream ifs;
-		ifs.exceptions( ifstream::failbit | ifstream::badbit | ifstream::eofbit );
-		ifs.open( filename, ifstream::in | ifstream::binary );
-		shaderCode.assign( (istreambuf_iterator<char>(ifs)), istreambuf_iterator<char>() /* EOS */ ); // Most Vexing Parse
+		ifs.exceptions( ifs.failbit | ifs.badbit | ifs.eofbit );
+		ifs.open( filename, ifs.in | ifs.binary | ifs.ate );
+
+		const auto fileSize = static_cast<size_t>( ifs.tellg() );
+
+		if( fileSize > 0 && (fileSize % sizeof(Type) == 0) ){
+			ifs.seekg( ifs.beg );
+			data.resize( fileSize / sizeof(Type) );
+			ifs.read( reinterpret_cast<char*>(data.data()), fileSize );
+		}
 	}
 	catch( ... ){
-		shaderCode.clear();
+		data.clear();
 	}
 
-	if( shaderCode.empty() || shaderCode.size() % 4 != 0 /* per spec; % sizeof(uint32_t) presumably */ ){
-		throw "SPIR-V shader file " + filename + " is invalid or read failed!";
-	}
+	return data;
+}
 
+VkShaderModule initShaderModule( VkDevice device, string filename ){
+	const auto shaderCode = loadBinaryFile<uint32_t>( filename );
+	if( shaderCode.empty() ) throw "SPIR-V shader file " + filename + " is invalid or read failed!";
+	return initShaderModule( device, shaderCode );
+}
+
+VkShaderModule initShaderModule( VkDevice device, const vector<uint32_t>& shaderCode ){
 	VkShaderModuleCreateInfo shaderModuleInfo{
 		VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
 		nullptr, // pNext
 		0, // flags - reserved for future use
-		shaderCode.size(),
-		reinterpret_cast<const uint32_t*>( shaderCode.data() )
+		shaderCode.size() * sizeof(uint32_t),
+		shaderCode.data()
 	};
-
 
 	VkShaderModule shaderModule;
 	VkResult errorCode = vkCreateShaderModule( device, &shaderModuleInfo, nullptr, &shaderModule ); RESULT_HANDLER( errorCode, "vkCreateShaderModule" );
