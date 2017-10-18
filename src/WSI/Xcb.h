@@ -40,11 +40,11 @@ void showWindow( PlatformWindow window );
 // Implementation
 //////////////////////////////////
 
-void nullHandler(){}
+bool nullHandler(){ return false; }
 
-std::function<void(void)> sizeEventHandler = nullHandler;
+std::function<bool(void)> sizeEventHandler = nullHandler;
 
-void setSizeEventHandler( std::function<void(void)> newSizeEventHandler ){
+void setSizeEventHandler( std::function<bool(void)> newSizeEventHandler ){
 	if( !newSizeEventHandler ) sizeEventHandler = nullHandler;
 	sizeEventHandler = newSizeEventHandler;
 }
@@ -61,15 +61,16 @@ void showWindow( PlatformWindow window ){
 	xcb_flush( window.connection );
 }
 
-int width = -1;
-int height = -1;
-bool windowReady = false;
-
+TODO( "Need to test XCB when I get to a linux machine." )
 int messageLoop( PlatformWindow window ){
+	int width = -1;
+	int height = -1;
+	bool hasSwapchain = false;
+
 	bool quit = false;
 
 	while( !quit ){
-		xcb_generic_event_t* e = xcb_poll_for_event( window.connection );
+		xcb_generic_event_t* e = hasSwapchain ? xcb_poll_for_event( window.connection ) : xcb_wait_for_event( window.connection )
 
 		if( e ){
 			switch( e->response_type & ~0x80 ){
@@ -83,9 +84,7 @@ int messageLoop( PlatformWindow window ){
 						width = ce->width;
 						height = ce->height;
 
-						sizeEventHandler();
-
-						windowReady = true;
+						hasSwapchain = sizeEventHandler();
 					}
 
 					break;
@@ -132,7 +131,7 @@ int messageLoop( PlatformWindow window ){
 
 			free( e );
 		}
-		else if( windowReady ){ // no events pending
+		else if( hasSwapchain ){ // no events pending
 			paintEventHandler();
 		}
 	}

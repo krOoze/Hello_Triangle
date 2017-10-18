@@ -26,8 +26,10 @@
 
 // platform specific settings
 
+TODO( "Possibly BS, because Cygwin and MinGW also defines _WIN32?" )
 #if defined(_WIN32)
 	#define USE_PLATFORM_GLFW
+	//#define VK_USE_PLATFORM_WIN32_KHR
 	#if defined(_WIN32) && !defined(_CONSOLE)
 		#include "LeanWindowsEnvironment.h"
 		#include <Windows.h>

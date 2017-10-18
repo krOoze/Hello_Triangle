@@ -307,22 +307,25 @@ int helloTriangle() try{
 	VkSemaphore imageReadyS = VK_NULL_HANDLE;
 	VkSemaphore renderDoneS = VK_NULL_HANDLE;
 
+	bool swapchainCreated = false;
 
-	auto recreateSwapchain = [&](){
+	const std::function<bool(void)> recreateSwapchain = [&](){
 		// swapchain recreation -- will be done before the first frame too;
 
 		VkResult errorCode = vkDeviceWaitIdle( device ); RESULT_HANDLER( errorCode, "vkDeviceWaitIdle" );
 
-		// cleanup -- BTW Vulkan is OK destroying NULL objects too
-		errorCode = vkResetCommandPool( device, commandPool, 0 ); RESULT_HANDLER( errorCode, "vkResetCommandPool" );
+		// cleanup
+		if( swapchainCreated ){
+			errorCode = vkResetCommandPool( device, commandPool, 0 ); RESULT_HANDLER( errorCode, "vkResetCommandPool" );
 
-		killSemaphore( device, imageReadyS );
-		killSemaphore( device, renderDoneS );
-		killFramebuffers( device, framebuffers );
-		killSwapchainImageViews( device, swapchainImageViews );
-		killSwapchain( device, swapchain ); swapchain = VK_NULL_HANDLE;
+			killSemaphore( device, imageReadyS );
+			killSemaphore( device, renderDoneS );
+			killFramebuffers( device, framebuffers );
+			killSwapchainImageViews( device, swapchainImageViews );
+			killSwapchain( device, swapchain ); swapchain = VK_NULL_HANDLE;
 
-		killPipeline( device, pipeline );
+			killPipeline( device, pipeline );
+		}
 
 		// recreation
 		VkSurfaceCapabilitiesKHR capabilities = getSurfaceCapabilities( physicalDevice, surface );
@@ -331,45 +334,58 @@ int helloTriangle() try{
 			capabilities.currentExtent.height == UINT32_MAX ? ::initialWindowHeight : capabilities.currentExtent.height,
 		};
 
-		swapchain = initSwapchain( physicalDevice, device, surface, surfaceFormat, capabilities, swapchain );
+		if(
+		    surfaceSize.width  < capabilities.minImageExtent.width  || surfaceSize.width  > capabilities.maxImageExtent.width  || surfaceSize.width < 1
+		 || surfaceSize.height < capabilities.minImageExtent.height || surfaceSize.height > capabilities.maxImageExtent.height || surfaceSize.height < 1
+		){
+			// we need to wait for size that is compatible with swapchain
+			swapchainCreated = false;
+		}
+		else{
+			swapchain = initSwapchain( physicalDevice, device, surface, surfaceFormat, capabilities, swapchain );
 
-		vector<VkImage> swapchainImages = enumerate<VkImage>( device, swapchain );
-		swapchainImageViews = initSwapchainImageViews( device, swapchainImages, surfaceFormat.format );
-		framebuffers = initFramebuffers( device, renderPass, swapchainImageViews, surfaceSize.width, surfaceSize.height );
+			vector<VkImage> swapchainImages = enumerate<VkImage>( device, swapchain );
+			swapchainImageViews = initSwapchainImageViews( device, swapchainImages, surfaceFormat.format );
+			framebuffers = initFramebuffers( device, renderPass, swapchainImageViews, surfaceSize.width, surfaceSize.height );
 
-		pipeline = initPipeline(
-			device,
-			physicalDeviceProperties.limits,
-			pipelineLayout,
-			renderPass,
-			vertexShader,
-			fragmentShader,
-			vertexBufferBinding,
-			surfaceSize.width, surfaceSize.height
-		);
+			pipeline = initPipeline(
+				device,
+				physicalDeviceProperties.limits,
+				pipelineLayout,
+				renderPass,
+				vertexShader,
+				fragmentShader,
+				vertexBufferBinding,
+				surfaceSize.width, surfaceSize.height
+			);
 
-		acquireCommandBuffers(  device, commandPool, static_cast<uint32_t>( swapchainImages.size() ), commandBuffers  );
-		for( size_t i = 0; i < swapchainImages.size(); ++i ){
-			beginCommandBuffer( commandBuffers[i] );
-				recordBeginRenderPass( commandBuffers[i], renderPass, framebuffers[i], ::clearColor, surfaceSize.width, surfaceSize.height );
+			acquireCommandBuffers(  device, commandPool, static_cast<uint32_t>( swapchainImages.size() ), commandBuffers  );
+			for( size_t i = 0; i < swapchainImages.size(); ++i ){
+				beginCommandBuffer( commandBuffers[i] );
+					recordBeginRenderPass( commandBuffers[i], renderPass, framebuffers[i], ::clearColor, surfaceSize.width, surfaceSize.height );
 
-				recordBindPipeline( commandBuffers[i], pipeline );
-				recordBindVertexBuffer( commandBuffers[i], vertexBufferBinding, vertexBuffer );
+					recordBindPipeline( commandBuffers[i], pipeline );
+					recordBindVertexBuffer( commandBuffers[i], vertexBufferBinding, vertexBuffer );
 
-				recordDraw( commandBuffers[i], triangle );
+					recordDraw( commandBuffers[i], triangle );
 
-				recordEndRenderPass( commandBuffers[i] );
-			endCommandBuffer( commandBuffers[i] );
+					recordEndRenderPass( commandBuffers[i] );
+				endCommandBuffer( commandBuffers[i] );
+			}
+
+			imageReadyS = initSemaphore( device );
+			renderDoneS = initSemaphore( device );
+
+			swapchainCreated = true;
 		}
 
-		imageReadyS = initSemaphore( device );
-		renderDoneS = initSemaphore( device );
+		return swapchainCreated;
 	};
 
 
 	// Finally, rendering! Yay!
-	std::function<void(void)> render = [&](){
-		assert( swapchain != VK_NULL_HANDLE );
+	const std::function<void(void)> render = [&](){
+		assert( swapchainCreated ); // should be always true; should yield CPU if false
 
 		try{
 			uint32_t nextSwapchainImageIndex = getNextImageIndex( device, swapchain, imageReadyS );

@@ -136,11 +136,11 @@ VkSurfaceKHR initSurface( VkInstance instance, PlatformWindow window ){
 }
 
 
-void nullHandler(){}
+bool nullHandler(){ return false; }
 
-std::function<void(void)> sizeEventHandler = nullHandler;
+std::function<bool(void)> sizeEventHandler = nullHandler;
 
-void setSizeEventHandler( std::function<void(void)> newSizeEventHandler ){
+void setSizeEventHandler( std::function<bool(void)> newSizeEventHandler ){
 	if( !newSizeEventHandler ) sizeEventHandler = nullHandler;
 	sizeEventHandler = newSizeEventHandler;
 }
@@ -157,59 +157,69 @@ void showWindow( PlatformWindow window ){
 	XFlush( window.display );
 }
 
-int width = -1;
-int height = -1;
 
+TODO( "Need to test Xlib when I get to a linux machine." )
 int messageLoop( PlatformWindow window ){
+	int width = -1;
+	int height = -1;
+	bool hasSwapchain = false;
+
 	bool quit = false;
 
 	while( !quit ){
 		XEvent e;
-		XNextEvent( window.display, &e );
+		bool hasEvent = true;
+		if( hasSwapchain ) hasEvent = XCheckIfEvent( window.display, &e, []( Display*, XEvent*, XPointer){return true;}, nullptr );
+		else XNextEvent( window.display, &e );
 
-		switch( e.type  ){
-			case Expose:
-				paintEventHandler();
-				break;
+		if( hasEvent ){
+			switch( e.type  ){
+				case Expose:
+					paintEventHandler();
+					break;
 
-			case ConfigureNotify:{
-				XConfigureEvent ce = e.xconfigure;
-				if( ce.width != width || ce.height != height ){
-					width = ce.width;
-					height = ce.height;
+				case ConfigureNotify:{
+					XConfigureEvent ce = e.xconfigure;
+					if( ce.width != width || ce.height != height ){
+						width = ce.width;
+						height = ce.height;
 
-					sizeEventHandler();
+						hasSwapchain = sizeEventHandler();
+					}
+
+					break;
 				}
 
-				break;
-			}
+				case KeyPress:{
+					XKeyPressedEvent kpe = e.xkey;
 
-			case KeyPress:{
-				XKeyPressedEvent kpe = e.xkey;
+					KeySym key = XLookupKeysym( &kpe, 0 );
 
-				KeySym key = XLookupKeysym( &kpe, 0 );
+					switch( key ){
+						case XK_Escape:
+							quit = true;
+					}
 
-				switch( key ){
-					case XK_Escape:
+					break;
+				}
+
+				case ClientMessage:{
+					XClientMessageEvent cme = e.xclient;
+
+					Atom WM_DELETE_WINDOW = XInternAtom( window.display, "WM_DELETE_WINDOW", True );
+					if( (Atom)cme.data.l[0] == WM_DELETE_WINDOW ){
 						quit = true;
+					}
+
+					break;
 				}
 
-				break;
+				default:
+					throw "Unrecognized event type!";
 			}
-
-			case ClientMessage:{
-				XClientMessageEvent cme = e.xclient;
-
-				Atom WM_DELETE_WINDOW = XInternAtom( window.display, "WM_DELETE_WINDOW", True );
-				if( (Atom)cme.data.l[0] == WM_DELETE_WINDOW ){
-					quit = true;
-				}
-
-				break;
-			}
-
-			default:
-				throw "Unrecognized event type!";
+		}
+		else if( hasSwapchain ){
+			paintEventHandler();
 		}
 
 	}

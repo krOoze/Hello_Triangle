@@ -40,11 +40,11 @@ void showWindow( PlatformWindow window );
 // Implementation
 //////////////////////////////////
 
-void nullHandler(){}
+bool nullHandler(){ return false; }
 
-std::function<void(void)> sizeEventHandler = nullHandler;
+std::function<bool(void)> sizeEventHandler = nullHandler;
 
-void setSizeEventHandler( std::function<void(void)> newSizeEventHandler ){
+void setSizeEventHandler( std::function<bool(void)> newSizeEventHandler ){
 	if( !newSizeEventHandler ) sizeEventHandler = nullHandler;
 	sizeEventHandler = newSizeEventHandler;
 }
@@ -100,7 +100,8 @@ const GlfwSingleton GlfwSingleton::glfwInstance;
 
 void showWindow( PlatformWindow window ){
 	glfwShowWindow( window.window );
-	sizeEventHandler();
+	//sizeEventHandler();
+	TODO( "Why was sizeEventHandler() in showWindow()??" );
 }
 
 std::string getPlatformSurfaceExtensionName(){
@@ -153,11 +154,14 @@ GLFWmonitor* getCurrentMonitor( GLFWwindow* window ){
 	return bestmonitor;
 }
 
+bool hasSwapchain = false;
+
 void windowSizeCallback( GLFWwindow*, int, int ){
-	sizeEventHandler();
+	hasSwapchain = sizeEventHandler();
 }
 
 void windowRefreshCallback( GLFWwindow* ){
+	//logger << "refresh" << std::endl;
 	paintEventHandler();
 }
 
@@ -192,9 +196,10 @@ void keyCallback( GLFWwindow* window, int key, int /*scancode*/, int action, int
 int messageLoop( PlatformWindow window ){
 
 	while(  errors.empty() && !glfwWindowShouldClose( window.window )  ){
-		paintEventHandler(); // repaint always
+		if( hasSwapchain ) glfwPollEvents(); // do not block so I can paint
+		else glfwWaitEvents(); // allows blocking if no events
 
-		glfwPollEvents();
+		if( hasSwapchain ) paintEventHandler(); // repaint always even without OS repaint event
 	}
 
 	if( !errors.empty() ) throw to_string( errors.size() ) + " GLFW error(s) on backlog; 1st error: " + to_string( errors.front().error ) + ": " + errors.front().description;
@@ -216,7 +221,7 @@ PlatformWindow initWindow( const int canvasWidth, const int canvasHeight ){
 
 	glfwSetInputMode( window, GLFW_STICKY_KEYS, GLFW_TRUE );
 
-	glfwSetWindowSizeCallback( window, windowSizeCallback );
+	glfwSetFramebufferSizeCallback( window, windowSizeCallback );
 	glfwSetWindowRefreshCallback( window, windowRefreshCallback );
 	glfwSetKeyCallback( window, keyCallback );
 

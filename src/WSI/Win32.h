@@ -36,11 +36,11 @@ void showWindow( PlatformWindow window );
 // Implementation
 //////////////////////////////////
 
-void nullHandler(){}
+bool nullHandler(){ return false; }
 
-std::function<void(void)> sizeEventHandler = nullHandler;
+std::function<bool(void)> sizeEventHandler = nullHandler;
 
-void setSizeEventHandler( std::function<void(void)> newSizeEventHandler ){
+void setSizeEventHandler( std::function<bool(void)> newSizeEventHandler ){
 	if( !newSizeEventHandler ) sizeEventHandler = nullHandler;
 	sizeEventHandler = newSizeEventHandler;
 }
@@ -57,10 +57,10 @@ void showWindow( PlatformWindow window ){
 	SetForegroundWindow( window.hWnd );
 }
 
+bool hasSwapchain = false;
+
 int messageLoop( PlatformWindow window ){
 	UNREFERENCED_PARAMETER( window );
-
-	TODO( "Could perhaps use PeekMessage, validate the image when painted and invalidate it when no messages. And provide background brush. Should behave better." )
 
 	MSG msg;
 	BOOL ret = GetMessageW( &msg, NULL, 0, 0 );
@@ -76,43 +76,43 @@ int messageLoop( PlatformWindow window ){
 }
 
 LRESULT CALLBACK wndProc( HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam ){
-
 	switch( uMsg ){
-	case WM_CLOSE:
-		PostQuitMessage( 0 );
-		return 0;
-
-	TODO( "Probably needs to be implemented to allow seamless resizing." )
-	case WM_ERASEBKGND:
-		//log << "erase\n";
-		return DefWindowProc( hWnd, uMsg, wParam, lParam );
-
-	case WM_NCCALCSIZE:
-		//log << "nccalcsize " << wParam << " " << lParam << endl;
-		return DefWindowProc( hWnd, uMsg, wParam, lParam );
-
-	case WM_SIZE:
-		//log << "size " << wParam << " " << LOWORD( lParam ) << "x" << HIWORD( lParam ) << endl;
-		sizeEventHandler();
-		return 0;
-
-	case WM_PAINT: // sent after WM_SIZE -- react to this immediately to resize seamlessly
-		//ValidateRect( hWnd, NULL ); // never validate so window always gets redrawn
-		//log << "paint\n";
-		paintEventHandler();
-		return 0;
-
-	case WM_KEYDOWN:
-		switch( wParam ){
-		case VK_ESCAPE:
+		case WM_CLOSE:
 			PostQuitMessage( 0 );
 			return 0;
-		}
-		return 0;
 
-	default:
-		//log << "unknown " << to_string( uMsg ) << endl;
-		return DefWindowProc( hWnd, uMsg, wParam, lParam );
+		case WM_ERASEBKGND:
+			//logger << "erase\n";
+			//return DefWindowProc( hWnd, uMsg, wParam, lParam );
+			return 0; // background will be cleared by Vulkan in WM_PAINT instead
+
+		//case WM_NCCALCSIZE:
+		//	//logger << "nccalcsize " << wParam << " " << lParam << endl;
+		//	return DefWindowProc( hWnd, uMsg, wParam, lParam );
+
+		case WM_SIZE:
+			//logger << "size " << wParam << " " << LOWORD( lParam ) << "x" << HIWORD( lParam ) << std::endl;
+			hasSwapchain = sizeEventHandler();
+			if( !hasSwapchain ) ValidateRect( hWnd, NULL ); // prevent WM_PAINT on minimized window
+			return 0;
+
+		case WM_PAINT: // sent after WM_SIZE -- react to this immediately to resize seamlessly
+			//logger << "paint\n";
+			paintEventHandler();
+			//ValidateRect( hWnd, NULL ); // never validate so window always gets redrawn
+			return 0;
+
+		case WM_KEYDOWN:
+			switch( wParam ){
+			case VK_ESCAPE:
+				PostQuitMessage( 0 );
+				return 0;
+			}
+			return 0;
+
+		default:
+			//logger << "unknown " << to_string( uMsg ) << endl;
+			return DefWindowProc( hWnd, uMsg, wParam, lParam );
 	}
 }
 
