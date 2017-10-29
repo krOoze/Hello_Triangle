@@ -61,7 +61,6 @@ void showWindow( PlatformWindow window ){
 	xcb_flush( window.connection );
 }
 
-TODO( "Need to test XCB when I get to a linux machine." )
 int messageLoop( PlatformWindow window ){
 	int width = -1;
 	int height = -1;
@@ -70,7 +69,7 @@ int messageLoop( PlatformWindow window ){
 	bool quit = false;
 
 	while( !quit ){
-		xcb_generic_event_t* e = hasSwapchain ? xcb_poll_for_event( window.connection ) : xcb_wait_for_event( window.connection )
+		xcb_generic_event_t* e = hasSwapchain ? xcb_poll_for_event( window.connection ) : xcb_wait_for_event( window.connection );
 
 		if( e ){
 			switch( e->response_type & ~0x80 ){

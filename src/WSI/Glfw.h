@@ -98,10 +98,13 @@ class GlfwSingleton{
 };
 const GlfwSingleton GlfwSingleton::glfwInstance;
 
+bool hasSwapchain = false;
+
 void showWindow( PlatformWindow window ){
 	glfwShowWindow( window.window );
-	//sizeEventHandler();
-	TODO( "Why was sizeEventHandler() in showWindow()??" );
+
+	// on linux there is no automatic initial size event -- need to call explicitly
+	if( !hasSwapchain ) hasSwapchain = sizeEventHandler(); 
 }
 
 std::string getPlatformSurfaceExtensionName(){
@@ -154,14 +157,11 @@ GLFWmonitor* getCurrentMonitor( GLFWwindow* window ){
 	return bestmonitor;
 }
 
-bool hasSwapchain = false;
-
 void windowSizeCallback( GLFWwindow*, int, int ){
 	hasSwapchain = sizeEventHandler();
 }
 
 void windowRefreshCallback( GLFWwindow* ){
-	//logger << "refresh" << std::endl;
 	paintEventHandler();
 }
 

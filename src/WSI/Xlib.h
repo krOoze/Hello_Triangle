@@ -13,6 +13,8 @@
 #include "CompilerMessages.h"
 #include "ErrorHandling.h"
 
+TODO( "Xlib crashes for me sometimes on resize on vkDestroyImageView. Driver bug?" )
+
 
 TODO( "Easier to use, but might prevent platform co-existence. Could be namespaced. Make all of this a class?" )
 struct PlatformWindow{ Display* display; Window window; VisualID visual_id; };
@@ -37,6 +39,18 @@ int messageLoop( PlatformWindow window );
 // Implementation
 //////////////////////////////////
 
+class XlibSingleton{
+	static const XlibSingleton xlibInstance;
+
+	XlibSingleton(){
+		const auto success = XInitThreads();
+		if( !success ) throw "Failed to XInitThreads().";
+	}
+
+	~XlibSingleton(){}
+};
+const XlibSingleton XlibSingleton::xlibInstance;
+
 Display* initXlibDisplay(){
 	Display* display = XOpenDisplay( nullptr );
 
@@ -52,65 +66,70 @@ void killXlibDisplay( Display* display ){
 PlatformWindow initWindow( int canvasWidth, int canvasHeight ){
 	Display* display = initXlibDisplay();
 
-	Screen* screen = XDefaultScreenOfDisplay( display );
+	XLockDisplay( display );
 
-	VisualID visual_id = XVisualIDFromVisual(  XDefaultVisualOfScreen( screen )  );
+		Screen* screen = XDefaultScreenOfDisplay( display );
 
-	Window root_window = XRootWindowOfScreen( screen );
+		VisualID visual_id = XVisualIDFromVisual(  XDefaultVisualOfScreen( screen )  );
 
-	//auto black = XBlackPixelOfScreen( screen );
-	//auto white = XWhitePixelOfScreen( screen );
+		Window root_window = XRootWindowOfScreen( screen );
 
-	unsigned long masks =
-		/*  CWBackPixmap
-		| CWBackPixel
-		| CWBorderPixmap
-		| CWBorderPixel
-		| CWBitGravity
-		| CWWinGravity
-		| CWBackingStore
-		| CWBackingPlanes
-		| CWBackingPixel
-		| CWOverrideRedirect
-		| CWSaveUnder
-		|*/ CWEventMask
-		/*| CWDontPropagate
-		| CWColormap
-		| CWCursor*/
-	;
+		//auto black = XBlackPixelOfScreen( screen );
+		//auto white = XWhitePixelOfScreen( screen );
 
-	XSetWindowAttributes values;
-	values.event_mask = ExposureMask | KeyPressMask | StructureNotifyMask;
+		unsigned long masks =
+			/*  CWBackPixmap
+			| CWBackPixel
+			| CWBorderPixmap
+			| CWBorderPixel
+			| CWBitGravity
+			| CWWinGravity
+			| CWBackingStore
+			| CWBackingPlanes
+			| CWBackingPixel
+			| CWOverrideRedirect
+			| CWSaveUnder
+			|*/ CWEventMask
+			/*| CWDontPropagate
+			| CWColormap
+			| CWCursor*/
+		;
+
+		XSetWindowAttributes values;
+		values.event_mask = ExposureMask | KeyPressMask | StructureNotifyMask;
 
 
-	Window window = XCreateWindow(
-		display,
-		root_window,
-		0, 0, // x, y
-		static_cast<unsigned int>( canvasWidth ), static_cast<unsigned int>( canvasHeight ),
-		1, //border_width
-		CopyFromParent,
-		InputOutput,
-		CopyFromParent,
-		masks,
-		&values
-	); 
+		Window window = XCreateWindow(
+			display,
+			root_window,
+			0, 0, // x, y
+			static_cast<unsigned int>( canvasWidth ), static_cast<unsigned int>( canvasHeight ),
+			1, //border_width
+			CopyFromParent,
+			InputOutput,
+			CopyFromParent,
+			masks,
+			&values
+		); 
 
-	const char* title = "Hello Vulkan Triangle";
+		const char* title = "Hello Vulkan Triangle";
 
-	XStoreName( display, window, title );
-	XSetIconName( display, window, title );
+		XStoreName( display, window, title );
+		XSetIconName( display, window, title );
 
-	Atom WM_DELETE_WINDOW = XInternAtom( display, "WM_DELETE_WINDOW", False );
-	XSetWMProtocols( display, window, &WM_DELETE_WINDOW, 1 );
+		Atom WM_DELETE_WINDOW = XInternAtom( display, "WM_DELETE_WINDOW", False );
+		XSetWMProtocols( display, window, &WM_DELETE_WINDOW, 1 );
 
-	XFlush( display );
+		XFlush( display );
+	XUnlockDisplay( display );
 	return { display, window, visual_id };
 }
 
 void killWindow( PlatformWindow window ){
-	XDestroyWindow( window.display, window.window );
-	XFlush( window.display );
+	XLockDisplay( window.display );
+		XDestroyWindow( window.display, window.window );
+		XFlush( window.display );
+	XUnlockDisplay( window.display );	
 
 	killXlibDisplay( window.display );
 }
@@ -153,8 +172,10 @@ void setPaintEventHandler( std::function<void(void)> newPaintEventHandler ){
 }
 
 void showWindow( PlatformWindow window ){
-	XMapWindow( window.display, window.window );
-	XFlush( window.display );
+	XLockDisplay( window.display );
+		XMapWindow( window.display, window.window );
+		XFlush( window.display );
+	XUnlockDisplay( window.display );
 }
 
 
@@ -169,8 +190,11 @@ int messageLoop( PlatformWindow window ){
 	while( !quit ){
 		XEvent e;
 		bool hasEvent = true;
-		if( hasSwapchain ) hasEvent = XCheckIfEvent( window.display, &e, []( Display*, XEvent*, XPointer){return true;}, nullptr );
-		else XNextEvent( window.display, &e );
+		constexpr auto always = []( Display*, XEvent*, XPointer ) -> Bool{return true;};
+		XLockDisplay( window.display );
+			if( hasSwapchain ) hasEvent = XCheckIfEvent( window.display, &e, always, nullptr );
+			else XNextEvent( window.display, &e );
+		XUnlockDisplay( window.display );
 
 		if( hasEvent ){
 			switch( e.type  ){
@@ -193,7 +217,9 @@ int messageLoop( PlatformWindow window ){
 				case KeyPress:{
 					XKeyPressedEvent kpe = e.xkey;
 
-					KeySym key = XLookupKeysym( &kpe, 0 );
+					XLockDisplay( window.display );
+						KeySym key = XLookupKeysym( &kpe, 0 );
+					XUnlockDisplay( window.display );
 
 					switch( key ){
 						case XK_Escape:
@@ -206,7 +232,10 @@ int messageLoop( PlatformWindow window ){
 				case ClientMessage:{
 					XClientMessageEvent cme = e.xclient;
 
-					Atom WM_DELETE_WINDOW = XInternAtom( window.display, "WM_DELETE_WINDOW", True );
+					XLockDisplay( window.display );
+						Atom WM_DELETE_WINDOW = XInternAtom( window.display, "WM_DELETE_WINDOW", True );
+					XUnlockDisplay( window.display );
+
 					if( (Atom)cme.data.l[0] == WM_DELETE_WINDOW ){
 						quit = true;
 					}
@@ -214,8 +243,8 @@ int messageLoop( PlatformWindow window ){
 					break;
 				}
 
-				default:
-					throw "Unrecognized event type!";
+				//default:
+				//	throw "Unrecognized event type!";
 			}
 		}
 		else if( hasSwapchain ){

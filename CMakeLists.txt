@@ -55,7 +55,7 @@ file(GLOB SOURCE_HEADERS "src/*.h")
 add_executable( HelloTriangle WIN32 src/HelloTriangle.cpp ${SOURCE_HEADERS} )
 add_dependencies( HelloTriangle HelloTriangle_shaders )
 
-if( WIN32 )
+if( MSVC )
 	target_compile_definitions( HelloTriangle PRIVATE $<$<CONFIG:Debug>:_CONSOLE> )
 	set_target_properties( HelloTriangle PROPERTIES LINK_FLAGS_DEBUG "/SUBSYSTEM:CONSOLE" )
 endif()
@@ -91,4 +91,7 @@ find_library(
 	NO_DEFAULT_PATH
 )
 message( "Vulkan libs: " ${VULKAN_LIBRARY} )
-target_link_libraries( HelloTriangle "${VULKAN_LIBRARY}" glfw )
+if( UNIX AND NOT CYGWIN AND NOT MINGW )
+	set( ADDITIONAL_LIBS xcb xcb-keysyms X11 )
+endif()
+target_link_libraries( HelloTriangle "${VULKAN_LIBRARY}" glfw ${ADDITIONAL_LIBS} )

@@ -44,6 +44,7 @@ TODO( "Possibly BS, because Cygwin and MinGW also defines _WIN32?" )
 #elif defined(__linux__)
 	#define USE_PLATFORM_GLFW
 	//#define VK_USE_PLATFORM_XCB_KHR
+	//#define VK_USE_PLATFORM_XLIB_KHR
 #else
 	//#error "Unsupported Vulkan WSI platform." // caught in main.cpp instead
 #endif
