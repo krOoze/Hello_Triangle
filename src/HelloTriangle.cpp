@@ -270,12 +270,12 @@ int helloTriangle() try{
 	VkSurfaceFormatKHR surfaceFormat = getSurfaceFormat( physicalDevice, surface );
 	VkRenderPass renderPass = initRenderPass( device, surfaceFormat );
 
-	vector<uint32_t> vertexShaderBinary = 
+	vector<uint32_t> vertexShaderBinary = {
 #include "shaders/hello_triangle.vert.spv.inl"
-	;
-	vector<uint32_t> fragmentShaderBinary =
+	};
+	vector<uint32_t> fragmentShaderBinary = {
 #include "shaders/hello_triangle.frag.spv.inl"
-	;
+	};
 	VkShaderModule vertexShader = initShaderModule( device, vertexShaderBinary );
 	VkShaderModule fragmentShader = initShaderModule( device, fragmentShaderBinary );
 	VkPipelineLayout pipelineLayout = initPipelineLayout( device );

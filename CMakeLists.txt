@@ -15,7 +15,7 @@ message( "Vulkan SDK path: " ${VULKAN_SDK} )
 
 # Shaders
 set( DEBUG_FLAG $<$<CONFIG:Debug>:-g> )
-set( GLSL_COMPILER ${VULKAN_SDK}/bin/glslc -mfmt=c ${DEBUG_FLAG} )
+set( GLSL_COMPILER ${VULKAN_SDK}/bin/glslc -mfmt=num ${DEBUG_FLAG} )
 
 set(VERT_SHADER "src/shaders/hello_triangle.vert")
 set(VERT_SHADER_INCLUDE ${VERT_SHADER}.spv.inl)
