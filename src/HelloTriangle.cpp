@@ -1567,7 +1567,7 @@ void killCommandPool( VkDevice device, VkCommandPool commandPool ){
 }
 
 void acquireCommandBuffers( VkDevice device, VkCommandPool commandPool, uint32_t count, vector<VkCommandBuffer>& commandBuffers ){
-	auto oldSize = commandBuffers.size();
+	const auto oldSize = static_cast<uint32_t>( commandBuffers.size() );
 
 	if( count > oldSize ){
 		VkCommandBufferAllocateInfo commandBufferInfo{
@@ -1575,11 +1575,16 @@ void acquireCommandBuffers( VkDevice device, VkCommandPool commandPool, uint32_t
 			nullptr, // pNext
 			commandPool,
 			VK_COMMAND_BUFFER_LEVEL_PRIMARY,
-			count - static_cast<uint32_t>( oldSize ) // count
+			count - oldSize // count
 		};
 
 		commandBuffers.resize( count );
 		VkResult errorCode = vkAllocateCommandBuffers( device, &commandBufferInfo, &commandBuffers[oldSize] ); RESULT_HANDLER( errorCode, "vkAllocateCommandBuffers" );
+	}
+
+	if( count < oldSize ) {
+		vkFreeCommandBuffers( device, commandPool, oldSize - count, &commandBuffers[count] );
+		commandBuffers.resize( count );
 	}
 }
 
