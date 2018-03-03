@@ -35,7 +35,8 @@ TODO( "Possibly BS, because Cygwin and MinGW also defines _WIN32?" )
 		#include <Windows.h>
 	#endif
 #elif defined(__CYGWIN__)
-	#define VK_USE_PLATFORM_WIN32_KHR
+	#define USE_PLATFORM_GLFW
+	//#define VK_USE_PLATFORM_WIN32_KHR
 	#include "LeanWindowsEnvironment.h" // Windows.h settings must be first -- vulkan.h does include Windows.h
 #elif defined(__MINGW32__)
 	#define USE_PLATFORM_GLFW

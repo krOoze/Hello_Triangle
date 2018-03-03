@@ -150,8 +150,7 @@ There are annoying (on purpose) TODOs generated on build. They can be disabled
 by defining `NO_TODO` preprocessor macro.
 
 Using GLFW is optional. You may choose another windowing platform by modifying
-`VulkanEnvironment.h`. By default all platforms use GLFW except Cygwin (which
-uses Win32 directly to reduce dependencies on X11).
+`VulkanEnvironment.h`. By default all platforms use GLFW.
 
 TODO cmake should link glfw, xcb, or xlib based on the platform used
 

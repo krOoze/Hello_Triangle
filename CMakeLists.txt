@@ -47,6 +47,14 @@ add_custom_target(
 set( GLFW_BUILD_DOCS OFF CACHE BOOL "" FORCE )
 set( GLFW_BUILD_TESTS OFF CACHE BOOL "" FORCE )
 set( GLFW_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE )
+
+if( CYGWIN )
+	# Hack to make GLFW use Win32 WSI instead of X11
+	# TODO: Might be cleaner to use cross-compiling
+	unset( UNIX )
+	set( WIN32 1 )
+endif()
+
 add_subdirectory( external/glfw )
 
 # HelloTriangle binary
