@@ -173,7 +173,7 @@ PlatformWindow initWindow( int canvasWidth, int canvasHeight ){
 	HWND hWnd =  CreateWindowExW(
 		exStyle,
 		MAKEINTATOM(wndClassAtom),
-		TEXT("Hello Vulkan Triangle"),
+		TEXT("Hello Vulkan Triangle -- Win32"),
 		style,
 		CW_USEDEFAULT, CW_USEDEFAULT,
 		windowRect.right - windowRect.left, windowRect.bottom - windowRect.top,

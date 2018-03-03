@@ -215,7 +215,7 @@ bool platformPresentationSupport( VkInstance instance, VkPhysicalDevice device, 
 PlatformWindow initWindow( const int canvasWidth, const int canvasHeight ){
 	glfwWindowHint( GLFW_CLIENT_API, GLFW_NO_API );
 	glfwWindowHint( GLFW_VISIBLE, GLFW_FALSE );
-	GLFWwindow* window = glfwCreateWindow( canvasWidth, canvasHeight, "Hello Vulkan Triangle", NULL, NULL );
+	GLFWwindow* window = glfwCreateWindow( canvasWidth, canvasHeight, "Hello Vulkan Triangle -- GLFW", NULL, NULL );
 
 	if( !window ) throw "Trouble creating GLFW window!";
 
