@@ -301,48 +301,56 @@ int helloTriangle() try{
 	vector<VkImageView> swapchainImageViews;
 	vector<VkFramebuffer> framebuffers;
 
-	VkPipeline pipeline = VK_NULL_HANDLE;
+	VkPipeline pipeline;
 	vector<VkCommandBuffer> commandBuffers;
 
-	VkSemaphore imageReadyS = VK_NULL_HANDLE;
-	VkSemaphore renderDoneS = VK_NULL_HANDLE;
+	VkSemaphore imageReadyS;
+	VkSemaphore renderDoneS;
 
-	bool swapchainCreated = false;
 
 	const std::function<bool(void)> recreateSwapchain = [&](){
 		// swapchain recreation -- will be done before the first frame too;
 
-		VkResult errorCode = vkDeviceWaitIdle( device ); RESULT_HANDLER( errorCode, "vkDeviceWaitIdle" );
-
-		// cleanup
-		if( swapchainCreated ){
-			errorCode = vkResetCommandPool( device, commandPool, 0 ); RESULT_HANDLER( errorCode, "vkResetCommandPool" );
-
-			killSemaphore( device, imageReadyS );
-			killSemaphore( device, renderDoneS );
-			killFramebuffers( device, framebuffers );
-			killSwapchainImageViews( device, swapchainImageViews );
-			killSwapchain( device, swapchain ); swapchain = VK_NULL_HANDLE;
-
-			killPipeline( device, pipeline );
-		}
-
-		// recreation
 		VkSurfaceCapabilitiesKHR capabilities = getSurfaceCapabilities( physicalDevice, surface );
 		VkExtent2D surfaceSize = {
 			capabilities.currentExtent.width == UINT32_MAX ? ::initialWindowWidth : capabilities.currentExtent.width,
 			capabilities.currentExtent.height == UINT32_MAX ? ::initialWindowHeight : capabilities.currentExtent.height,
 		};
 
-		if(
-		    surfaceSize.width  < capabilities.minImageExtent.width  || surfaceSize.width  > capabilities.maxImageExtent.width  || surfaceSize.width < 1
-		 || surfaceSize.height < capabilities.minImageExtent.height || surfaceSize.height > capabilities.maxImageExtent.height || surfaceSize.height < 1
-		){
-			// we need to wait for size that is compatible with swapchain
-			swapchainCreated = false;
+		const bool swapchainCreatable = {
+			   surfaceSize.width >= capabilities.minImageExtent.width
+			&& surfaceSize.width <= capabilities.maxImageExtent.width
+			&& surfaceSize.width > 0
+			&& surfaceSize.height >= capabilities.minImageExtent.height
+			&& surfaceSize.height <= capabilities.maxImageExtent.height
+			&& surfaceSize.height > 0
+		};
+
+		// cleanup old
+		if( swapchain ){
+			VkResult errorCode = vkDeviceWaitIdle( device ); RESULT_HANDLER( errorCode, "vkDeviceWaitIdle" );
+
+			killSemaphore( device, renderDoneS );
+			killSemaphore( device, imageReadyS );
+
+			// only reset + later reuse already allocated CBs
+			errorCode = vkResetCommandPool( device, commandPool, 0 ); RESULT_HANDLER( errorCode, "vkResetCommandPool" );
+
+			killPipeline( device, pipeline );
+			killFramebuffers( device, framebuffers );
+			killSwapchainImageViews( device, swapchainImageViews );
+
+			if( !swapchainCreatable ){
+				// we need to wait for size that is compatible with swapchain
+				// so just destroy swapchain to conserve resources in the meantime
+				killSwapchain( device, swapchain );
+				swapchain = VK_NULL_HANDLE;
+			}
 		}
-		else{
-			swapchain = initSwapchain( physicalDevice, device, surface, surfaceFormat, capabilities, swapchain );
+
+		// creating new
+		if( swapchainCreatable ){
+			swapchain = initSwapchain( physicalDevice, device, surface, surfaceFormat, capabilities, swapchain ); // reuses & destroys oldSwapchain
 
 			vector<VkImage> swapchainImages = enumerate<VkImage>( device, swapchain );
 			swapchainImageViews = initSwapchainImageViews( device, swapchainImages, surfaceFormat.format );
@@ -375,17 +383,15 @@ int helloTriangle() try{
 
 			imageReadyS = initSemaphore( device );
 			renderDoneS = initSemaphore( device );
-
-			swapchainCreated = true;
 		}
 
-		return swapchainCreated;
+		return swapchain != VK_NULL_HANDLE;
 	};
 
 
 	// Finally, rendering! Yay!
 	const std::function<void(void)> render = [&](){
-		assert( swapchainCreated ); // should be always true; should yield CPU if false
+		assert( swapchain ); // should be always true; should have yielded CPU if false
 
 		try{
 			uint32_t nextSwapchainImageIndex = getNextImageIndex( device, swapchain, imageReadyS );
