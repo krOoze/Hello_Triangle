@@ -108,6 +108,10 @@ dangerous to the PCB in long term).
 Build
 ----------------------------------------------
 
+First just get everything:
+
+    $ git clone --recurse-submodules https://github.com/krOoze/Hello_Triangle.git
+
 In many platforms CMake style build should work just fine:
 
     $ cmake -G"Your preferred generator"
