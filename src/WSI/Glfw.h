@@ -162,7 +162,8 @@ void windowSizeCallback( GLFWwindow*, int, int ){
 }
 
 void windowRefreshCallback( GLFWwindow* ){
-	paintEventHandler();
+	//logger << "refresh" << std::endl;
+	if( hasSwapchain ) paintEventHandler();
 }
 
 void toggleFullscreen( GLFWwindow* window ){
