@@ -108,6 +108,8 @@ void showWindow( PlatformWindow window ){
 }
 
 std::string getPlatformSurfaceExtensionName(){
+	using std::string;
+
 	uint32_t count;
 	const char** extensions = glfwGetRequiredInstanceExtensions( &count ); // GLFW owns **extensions!!!
 
@@ -195,6 +197,7 @@ void keyCallback( GLFWwindow* window, int key, int /*scancode*/, int action, int
 }
 
 int messageLoop( PlatformWindow window ){
+	using std::to_string;
 
 	while(  errors.empty() && !glfwWindowShouldClose( window.window )  ){
 		if( hasSwapchain ) glfwPollEvents(); // do not block so I can paint

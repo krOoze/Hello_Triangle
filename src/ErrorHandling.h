@@ -120,8 +120,8 @@ const char* to_string( VkDebugReportObjectTypeEXT o ){
 	}
 }
 
-string d_to_string( VkDebugReportFlagsEXT msgFlags ){
-	string res;
+std::string d_to_string( VkDebugReportFlagsEXT msgFlags ){
+	std::string res;
 	bool first = true;
 
 	if( msgFlags & VK_DEBUG_REPORT_ERROR_BIT_EXT ){
@@ -164,7 +164,7 @@ string d_to_string( VkDebugReportFlagsEXT msgFlags ){
 	return res;
 }
 
-string to_string_hex( const uint64_t n ){
+std::string to_string_hex( const uint64_t n ){
 	std::stringstream ss;
 	ss << std::hex << std::noshowbase << std::uppercase << n;
 	return "0x" + ss.str();

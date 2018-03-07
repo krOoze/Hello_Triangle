@@ -10,38 +10,33 @@
 // Includes
 //////////////////////////////////////////////////////////////////////////////////
 
-#include <cstdlib>
-
-#include <vector>
-using std::vector;
-
-#include <string>
-using std::string;
-using std::to_string;
-
-#include <exception>
-#include <stdexcept>
-using std::exception;
-using std::runtime_error;
-
-#include <fstream>
-#include <iterator>
-
-#include <cmath>
-#include <algorithm>
-#include <functional>
-
 #include <cassert>
+#include <cmath>
+#include <cstdlib>
+#include <algorithm>
+#include <exception>
+#include <fstream>
+#include <functional>
+#include <iterator>
+#include <stdexcept>
+#include <string>
+#include <vector>
 
 #include <vulkan/vulkan.h> // also assume core+WSI commands are loaded
 static_assert( VK_HEADER_VERSION >= REQUIRED_HEADER_VERSION, "Update your SDK! This app is written against Vulkan header version " STRINGIZE(REQUIRED_HEADER_VERSION) "." );
 
+#include "EnumerateScheme.h"
+#include "ErrorHandling.h"
+#include "ExtensionLoader.h"
+#include "Vertex.h"
 #include "Wsi.h"
 
-#include "ErrorHandling.h"
-#include "Vertex.h"
-#include "EnumerateScheme.h"
-#include "ExtensionLoader.h"
+
+using std::exception;
+using std::runtime_error;
+using std::string;
+using std::to_string;
+using std::vector;
 
 
 // Config
