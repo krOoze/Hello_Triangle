@@ -199,7 +199,7 @@ void recordBindVertexBuffer( VkCommandBuffer commandBuffer, const uint32_t verte
 
 void recordDraw( VkCommandBuffer commandBuffer, const vector<Vertex2D_ColorF_pack> vertices );
 
-void submitToQueue( VkQueue queue, VkCommandBuffer commandBuffer, VkSemaphore imageReadyS, VkSemaphore renderDoneS );
+void submitToQueue( VkQueue queue, VkCommandBuffer commandBuffer, VkSemaphore imageReadyS, VkSemaphore renderDoneS, VkFence fence = VK_NULL_HANDLE );
 void present( VkQueue queue, VkSwapchainKHR swapchain, uint32_t swapchainImageIndex, VkSemaphore renderDoneS );
 
 
@@ -302,6 +302,11 @@ int helloTriangle() try{
 	VkSemaphore imageReadyS = VK_NULL_HANDLE; // has to be NULL for the case the app ends before even first swapchain
 	VkSemaphore renderDoneS = VK_NULL_HANDLE; // has to be NULL for the case the app ends before even first swapchain
 
+	// workaround for validation layer "leak" + might also help driver to cleanup old resources
+	// this should not happen for real-word app, because they are likely to use fences naturaly (e.g. user input reaction)
+	// read https://github.com/KhronosGroup/Vulkan-LoaderAndValidationLayers/issues/1628
+	const uint32_t maxInflightSubmissions = 60;
+	uint32_t inflightSubmissions = 0;
 
 	const std::function<bool(void)> recreateSwapchain = [&](){
 		// swapchain recreation -- will be done before the first frame too;
@@ -323,8 +328,10 @@ int helloTriangle() try{
 
 		// cleanup old
 		if( swapchain ){
-			VkResult errorCode = vkDeviceWaitIdle( device ); RESULT_HANDLER( errorCode, "vkDeviceWaitIdle" );
+			{VkResult errorCode = vkDeviceWaitIdle( device ); RESULT_HANDLER( errorCode, "vkDeviceWaitIdle" );}
+			inflightSubmissions = 0;
 
+			// semafores might be in signaled state, so kill them too to get fresh unsignaled
 			killSemaphore( device, renderDoneS );
 			killSemaphore( device, imageReadyS );
 
@@ -391,7 +398,14 @@ int helloTriangle() try{
 		try{
 			uint32_t nextSwapchainImageIndex = getNextImageIndex( device, swapchain, imageReadyS );
 
+			if( inflightSubmissions >= maxInflightSubmissions ){
+				vkQueueWaitIdle( queue );
+				inflightSubmissions = 0;
+			}
+
 			submitToQueue( queue, commandBuffers[nextSwapchainImageIndex], imageReadyS, renderDoneS );
+			++inflightSubmissions;
+
 			present( queue, swapchain, nextSwapchainImageIndex, renderDoneS );
 		}
 		catch( VulkanResultException ex ){
@@ -417,6 +431,7 @@ int helloTriangle() try{
 
 	// proper Vulkan cleanup
 	VkResult errorCode = vkDeviceWaitIdle( device ); RESULT_HANDLER( errorCode, "vkDeviceWaitIdle" );
+
 
 	// kill swapchain
 	killSemaphore( device, renderDoneS );
@@ -1646,7 +1661,7 @@ void recordDraw( VkCommandBuffer commandBuffer, const vector<Vertex2D_ColorF_pac
 	vkCmdDraw( commandBuffer, static_cast<uint32_t>( vertices.size() ), 1 /*instance count*/, 0 /*first vertex*/, 0 /*first instance*/ );
 }
 
-void submitToQueue( VkQueue queue, VkCommandBuffer commandBuffer, VkSemaphore imageReadyS, VkSemaphore renderDoneS ){
+void submitToQueue( VkQueue queue, VkCommandBuffer commandBuffer, VkSemaphore imageReadyS, VkSemaphore renderDoneS, VkFence fence ){
 	VkPipelineStageFlags psw = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
 
 	VkSubmitInfo submit{
@@ -1661,7 +1676,7 @@ void submitToQueue( VkQueue queue, VkCommandBuffer commandBuffer, VkSemaphore im
 		&renderDoneS // signal semaphores
 	};
 
-	VkResult errorCode = vkQueueSubmit( queue, 1 /*submit count*/, &submit, VK_NULL_HANDLE /*fence*/); RESULT_HANDLER( errorCode, "vkQueueSubmit" );
+	VkResult errorCode = vkQueueSubmit( queue, 1 /*submit count*/, &submit, fence ); RESULT_HANDLER( errorCode, "vkQueueSubmit" );
 }
 
 void present( VkQueue queue, VkSwapchainKHR swapchain, uint32_t swapchainImageIndex, VkSemaphore renderDoneS ){
