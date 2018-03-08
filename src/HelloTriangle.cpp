@@ -138,7 +138,7 @@ void killSwapchain( VkDevice device, VkSwapchainKHR swapchain );
 uint32_t getNextImageIndex( VkDevice device, VkSwapchainKHR swapchain, VkSemaphore imageReadyS );
 
 vector<VkImageView> initSwapchainImageViews( VkDevice device, vector<VkImage> images, VkFormat format );
-void killSwapchainImageViews( VkDevice device, vector<VkImageView> imageViews );
+void killSwapchainImageViews( VkDevice device, vector<VkImageView>& imageViews );
 
 
 VkRenderPass initRenderPass( VkDevice device, VkSurfaceFormatKHR surfaceFormat );
@@ -150,7 +150,7 @@ vector<VkFramebuffer> initFramebuffers(
 	vector<VkImageView> imageViews,
 	uint32_t width, uint32_t height
 );
-void killFramebuffers( VkDevice device, vector<VkFramebuffer> framebuffers );
+void killFramebuffers( VkDevice device, vector<VkFramebuffer>& framebuffers );
 
 
 VkShaderModule initShaderModule( VkDevice device, const vector<uint32_t>& shaderCode );
@@ -292,15 +292,15 @@ int helloTriangle() try{
 
 
 	// place-holder swapchain dependent objects
-	VkSwapchainKHR swapchain = VK_NULL_HANDLE;
+	VkSwapchainKHR swapchain = VK_NULL_HANDLE; // has to be NULL -- signifies that there's no swapchain
 	vector<VkImageView> swapchainImageViews;
 	vector<VkFramebuffer> framebuffers;
 
-	VkPipeline pipeline;
+	VkPipeline pipeline = VK_NULL_HANDLE; // has to be NULL for the case the app ends before even first swapchain
 	vector<VkCommandBuffer> commandBuffers;
 
-	VkSemaphore imageReadyS;
-	VkSemaphore renderDoneS;
+	VkSemaphore imageReadyS = VK_NULL_HANDLE; // has to be NULL for the case the app ends before even first swapchain
+	VkSemaphore renderDoneS = VK_NULL_HANDLE; // has to be NULL for the case the app ends before even first swapchain
 
 
 	const std::function<bool(void)> recreateSwapchain = [&](){
@@ -328,8 +328,8 @@ int helloTriangle() try{
 			killSemaphore( device, renderDoneS );
 			killSemaphore( device, imageReadyS );
 
-			// only reset + later reuse already allocated CBs
-			errorCode = vkResetCommandPool( device, commandPool, 0 ); RESULT_HANDLER( errorCode, "vkResetCommandPool" );
+			// only reset + later reuse already allocated and create new only if needed 
+			{VkResult errorCode = vkResetCommandPool( device, commandPool, 0 ); RESULT_HANDLER( errorCode, "vkResetCommandPool" );}
 
 			killPipeline( device, pipeline );
 			killFramebuffers( device, framebuffers );
@@ -419,15 +419,18 @@ int helloTriangle() try{
 	VkResult errorCode = vkDeviceWaitIdle( device ); RESULT_HANDLER( errorCode, "vkDeviceWaitIdle" );
 
 	// kill swapchain
-	killSemaphore( device, imageReadyS );
 	killSemaphore( device, renderDoneS );
+	killSemaphore( device, imageReadyS );
+
+	// command buffers killed with pool
+
+	killPipeline( device, pipeline );
 
 	killFramebuffers( device, framebuffers );
 
 	killSwapchainImageViews( device, swapchainImageViews );
 	killSwapchain( device, swapchain );
 
-	killPipeline( device, pipeline );
 
 	// kill vulkan
 	killCommandPool( device,  commandPool );
@@ -1102,7 +1105,7 @@ vector<VkImageView> initSwapchainImageViews( VkDevice device, vector<VkImage> im
 	return imageViews;
 }
 
-void killSwapchainImageViews( VkDevice device, vector<VkImageView> imageViews ){
+void killSwapchainImageViews( VkDevice device, vector<VkImageView>& imageViews ){
 	for( auto imageView : imageViews ) vkDestroyImageView( device, imageView, nullptr );
 	imageViews.clear();
 }
@@ -1213,7 +1216,7 @@ vector<VkFramebuffer> initFramebuffers(
 	return framebuffers;
 }
 
-void killFramebuffers( VkDevice device, vector<VkFramebuffer> framebuffers ){
+void killFramebuffers( VkDevice device, vector<VkFramebuffer>& framebuffers ){
 	for( auto framebuffer : framebuffers ) vkDestroyFramebuffer( device, framebuffer, nullptr );
 	framebuffers.clear();
 }
@@ -1535,10 +1538,10 @@ void setVertexData( VkDevice device, VkDeviceMemory memory, vector<Vertex2D_Colo
 }
 
 VkSemaphore initSemaphore( VkDevice device ){
-	VkSemaphoreCreateInfo semaphoreInfo{
+	const VkSemaphoreCreateInfo semaphoreInfo{
 		VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
 		nullptr, // pNext
-		0, // flags - reserved for future use
+		0 // flags - reserved for future use
 	};
 
 	VkSemaphore semaphore;
