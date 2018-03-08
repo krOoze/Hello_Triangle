@@ -1,17 +1,16 @@
 #ifndef HELLO_TRIANGLE_WSI_PLATFORM_H
 #define HELLO_TRIANGLE_WSI_PLATFORM_H
 
-#if defined(USE_PLATFORM_GLFW) \
-  + defined(VK_USE_PLATFORM_ANDROID_KHR) \
-  + defined(VK_USE_PLATFORM_MIR_KHR) \
-  + defined(VK_USE_PLATFORM_WAYLAND_KHR) \
-  + defined(VK_USE_PLATFORM_WIN32_KHR) \
-  + defined(VK_USE_PLATFORM_XCB_KHR) \
-  + defined(VK_USE_PLATFORM_XLIB_KHR) \
-  + defined(VK_USE_PLATFORM_IOS_MVK) \
-  + defined(VK_USE_PLATFORM_MACOS_MVK) \
-  + defined(VK_USE_PLATFORM_VI_NN) \
-  != 1
+#if  !defined(USE_PLATFORM_GLFW) \
+  && !defined(VK_USE_PLATFORM_ANDROID_KHR) \
+  && !defined(VK_USE_PLATFORM_MIR_KHR) \
+  && !defined(VK_USE_PLATFORM_WAYLAND_KHR) \
+  && !defined(VK_USE_PLATFORM_WIN32_KHR) \
+  && !defined(VK_USE_PLATFORM_XCB_KHR) \
+  && !defined(VK_USE_PLATFORM_XLIB_KHR) \
+  && !defined(VK_USE_PLATFORM_IOS_MVK) \
+  && !defined(VK_USE_PLATFORM_MACOS_MVK) \
+  && !defined(VK_USE_PLATFORM_VI_NN)
 	#error "Exactly one Vulkan WSI platform must be defined."
 #endif
 

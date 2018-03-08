@@ -24,30 +24,49 @@
 	#endif
 #endif
 
-// platform specific settings
+#if  defined(USE_PLATFORM_GLFW) \
+  || defined(VK_USE_PLATFORM_ANDROID_KHR) \
+  || defined(VK_USE_PLATFORM_MIR_KHR) \
+  || defined(VK_USE_PLATFORM_WAYLAND_KHR) \
+  || defined(VK_USE_PLATFORM_WIN32_KHR) \
+  || defined(VK_USE_PLATFORM_XCB_KHR) \
+  || defined(VK_USE_PLATFORM_XLIB_KHR) \
+  || defined(VK_USE_PLATFORM_IOS_MVK) \
+  || defined(VK_USE_PLATFORM_MACOS_MVK) \
+  || defined(VK_USE_PLATFORM_VI_NN)
+	#define WSI_CHOSEN_EXTERNALLY
+#endif
 
-TODO( "Possibly BS, because Cygwin and MinGW also defines _WIN32?" )
-#if defined(_WIN32)
-	#define USE_PLATFORM_GLFW
-	//#define VK_USE_PLATFORM_WIN32_KHR
+// platform specific settings
+#if defined(__CYGWIN__)
+	#ifndef WSI_CHOSEN_EXTERNALLY
+		#define USE_PLATFORM_GLFW
+		//#define VK_USE_PLATFORM_WIN32_KHR
+	#endif
+	#include "LeanWindowsEnvironment.h" // Windows.h settings must be first -- vulkan.h does include Windows.h
+#elif defined(__MINGW32__)
+	#ifndef WSI_CHOSEN_EXTERNALLY
+		#define USE_PLATFORM_GLFW
+		//#define VK_USE_PLATFORM_WIN32_KHR
+	#endif
+	//#include "LeanWindowsEnvironment.h" // Windows.h settings must be first -- vulkan.h does include Windows.h
+#elif defined(_WIN32)
+	#ifndef WSI_CHOSEN_EXTERNALLY
+		#define USE_PLATFORM_GLFW
+		//#define VK_USE_PLATFORM_WIN32_KHR
+	#endif
 	#if defined(_WIN32) && !defined(_CONSOLE)
 		#include "LeanWindowsEnvironment.h"
 		#include <Windows.h>
 	#endif
-#elif defined(__CYGWIN__)
-	#define USE_PLATFORM_GLFW
-	//#define VK_USE_PLATFORM_WIN32_KHR
-	#include "LeanWindowsEnvironment.h" // Windows.h settings must be first -- vulkan.h does include Windows.h
-#elif defined(__MINGW32__)
-	#define USE_PLATFORM_GLFW
-	//#define VK_USE_PLATFORM_WIN32_KHR
-	//#include "LeanWindowsEnvironment.h" // Windows.h settings must be first -- vulkan.h does include Windows.h
 #elif defined(__linux__)
-	#define USE_PLATFORM_GLFW
-	//#define VK_USE_PLATFORM_XCB_KHR
-	//#define VK_USE_PLATFORM_XLIB_KHR
+	#ifndef WSI_CHOSEN_EXTERNALLY
+		#define USE_PLATFORM_GLFW
+		//#define VK_USE_PLATFORM_XCB_KHR
+		//#define VK_USE_PLATFORM_XLIB_KHR
+	#endif
 #else
-	//#error "Unsupported Vulkan WSI platform." // caught in main.cpp instead
+	//#error "Unsupported OS platform." // caught in main.cpp instead
 #endif
 
 TODO( "Add other (all would be awesome) platforms" )
