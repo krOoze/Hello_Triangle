@@ -70,7 +70,7 @@ int messageLoop( PlatformWindow window ){
 			DispatchMessageW( &msg ); //dispatch to wndProc; ignore return from wndProc
 	}
 
-	if( ret == -1 ) throw string( "Trouble getting message: " ) + to_string( GetLastError() );
+	if( ret == -1 ) throw std::string( "Trouble getting message: " ) + std::to_string( GetLastError() );
 
 	return static_cast<int>( msg.wParam );
 }
@@ -148,7 +148,7 @@ ATOM initWindowClass(){
 		// register window class
 		classAtom = RegisterClassExW( &windowClass );
 		if( !classAtom ){
-			throw string( "Trouble registering window class: " ) + to_string( GetLastError() );
+			throw std::string( "Trouble registering window class: " ) + std::to_string( GetLastError() );
 		}
 	}
 
@@ -157,6 +157,9 @@ ATOM initWindowClass(){
 }
 
 PlatformWindow initWindow( int canvasWidth, int canvasHeight ){
+	using std::string;
+	using std::to_string;
+
 	HINSTANCE hInstance = GetModuleHandleW( NULL );
 
 	ATOM wndClassAtom = initWindowClass();
@@ -190,6 +193,9 @@ PlatformWindow initWindow( int canvasWidth, int canvasHeight ){
 }
 
 void killWindow( PlatformWindow window ){
+	using std::string;
+	using std::to_string;
+
 	if(  !DestroyWindow( window.hWnd )  ) throw string( "Trouble destroying window instance: " ) + to_string( GetLastError() );
 
 	--classAtomRefCount;
