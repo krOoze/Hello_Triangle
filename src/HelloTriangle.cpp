@@ -52,6 +52,8 @@ using std::vector;
 		| VK_DEBUG_REPORT_ERROR_BIT_EXT
 		//| VK_DEBUG_REPORT_DEBUG_BIT_EXT
 	;
+
+	constexpr bool useAssistantLayer = true;
 #endif
 
 constexpr bool fpsCounter = true;
@@ -222,6 +224,11 @@ int helloTriangle() try{
 #if VULKAN_VALIDATION
 	if(  isLayerSupported( "VK_LAYER_LUNARG_standard_validation", supportedLayers )  ) requestedLayers.push_back( "VK_LAYER_LUNARG_standard_validation" );
 	else throw "VULKAN_VALIDATION is enabled but VK_LAYER_LUNARG_standard_validation layers are not supported!";
+
+	if( ::useAssistantLayer ){
+		if(  isLayerSupported( "VK_LAYER_LUNARG_assistant_layer", supportedLayers )  ) requestedLayers.push_back( "VK_LAYER_LUNARG_assistant_layer" );
+		else throw "VULKAN_VALIDATION is enabled but VK_LAYER_LUNARG_assistant_layer layer is not supported!";
+	}
 #endif
 	if( ::fpsCounter ) requestedLayers.push_back( "VK_LAYER_LUNARG_monitor" );
 	requestedLayers = checkInstanceLayerSupport( requestedLayers, supportedLayers );
