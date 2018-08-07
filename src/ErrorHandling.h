@@ -182,14 +182,16 @@ VKAPI_ATTR VkBool32 VKAPI_CALL genericDebugCallback(
 ){
 	using std::endl;
 	using std::to_string;
+	using std::string;
 
-	const std::string report = d_to_string( flags ) + ": " + to_string( objectType ) + "(" + to_string_hex( object ) + ")" + ": " + to_string( messageCode ) + ", " + pLayerPrefix + ", " + pMessage;
+	const string report = d_to_string( flags ) + ": " + to_string( objectType ) + "(" + to_string_hex( object ) + ")" + ": " + to_string( messageCode ) + ", " + pLayerPrefix + ", \"" + pMessage + '"';
 
 	if( (flags & VK_DEBUG_REPORT_ERROR_BIT_EXT) || (flags & VK_DEBUG_REPORT_WARNING_BIT_EXT) || (flags & VK_DEBUG_REPORT_PERFORMANCE_WARNING_BIT_EXT) ){
-			logger << "\n!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n";
-			logger << report;
-			logger << "\n!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n";
-			logger << endl;
+			const string border( 80, '!' );
+
+			logger << border << endl;
+			logger << report << endl;
+			logger << border << endl << endl;
 	}
 	else{
 		logger << report << endl;

@@ -250,6 +250,10 @@ int helloTriangle() try{
 
 #if VULKAN_VALIDATION
 	const VkDebugReportCallbackEXT debug = initDebug( instance, ::debugAmount );
+
+	const int32_t uncoded = 0;
+	vkDebugReportMessageEXT( instance, VK_DEBUG_REPORT_PERFORMANCE_WARNING_BIT_EXT, VK_DEBUG_REPORT_OBJECT_TYPE_INSTANCE_EXT, (uint64_t)instance, __LINE__, uncoded, "Application",
+	                         "Validation Layers are enabled!" );
 #endif
 
 
