@@ -346,7 +346,7 @@ int helloTriangle() try{
 			killSemaphore( device, renderDoneS );
 			killSemaphore( device, imageReadyS );
 
-			// only reset + later reuse already allocated and create new only if needed 
+			// only reset + later reuse already allocated and create new only if needed
 			{VkResult errorCode = vkResetCommandPool( device, commandPool, 0 ); RESULT_HANDLER( errorCode, "vkResetCommandPool" );}
 
 			killPipeline( device, pipeline );
@@ -1174,18 +1174,19 @@ VkRenderPass initRenderPass( VkDevice device, VkSurfaceFormatKHR surfaceFormat )
 		0, // dstSubpass
 		VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, // srcStageMask
 		VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, // dstStageMask
-		VK_ACCESS_MEMORY_READ_BIT, // srcAccessMask
+		0, // srcAccessMask
 		VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, // dstAccessMask
 		VK_DEPENDENCY_BY_REGION_BIT, // dependencyFlags
 	};
 
+	// implicitly defined dependency would cover this, but let's replace it with this explicitly defined dependency!
 	VkSubpassDependency dstDependency{
 		0, // srcSubpass
 		VK_SUBPASS_EXTERNAL, // dstSubpass
 		VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, // srcStageMask
 		VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, // dstStageMask
 		VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, // srcAccessMask
-		VK_ACCESS_MEMORY_READ_BIT, // dstAccessMask
+		0, // dstAccessMask
 		VK_DEPENDENCY_BY_REGION_BIT, // dependencyFlags
 	};
 
