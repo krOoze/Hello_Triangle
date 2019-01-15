@@ -24,11 +24,12 @@ grafted on this basic example (it is nice to see a diff of what exactly needs to
 be changed to make it work). Their `README.md` should be edited to reflect the
 changes.
 
-| branch | description |
-|---|---|
-| `MSAA` | Antialiasing (i.e. Vulkan's multisample image resolve) |
-| `queue_transfer` | Transfer of `EXCLUSIVE` image between queue families (separate graphics and compute queue family) |
-| `vertex_offset` | Demonstrates how offset in `vkCmdBindVertexBuffers()` works |
+| branch | diff link | description |
+|---|---|---|
+| `master`| -- | Your regular Hello Triangle app, and base for the others
+| `MSAA`  | [diff](https://github.com/krOoze/Hello_Triangle/compare/MSAA) | Antialiasing (i.e. Vulkan's multisample image resolve) |
+| `queue_transfer` | [diff](https://github.com/krOoze/Hello_Triangle/compare/queue_transfer) | Transfer of `EXCLUSIVE` image between queue families (separate graphics and compute queue family) |
+| `vertex_offset` | [diff](https://github.com/krOoze/Hello_Triangle/compare/vertex_offset) | Demonstrates how offset in `vkCmdBindVertexBuffers()` works |
 
 Proper renderloop synchronization mini-tutorial
 -------------------------------------
