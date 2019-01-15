@@ -13,7 +13,7 @@
 #else
 
 #if defined(_MSC_VER)
-	#define TODO(desc) __pragma( message(__FILE__ "(" STRINGIZE(__LINE__) ")" ": warning TODO:"  desc) )
+	#define TODO(desc) __pragma( message(__FILE__ "(" STRINGIZE(__LINE__) ")" ": warning T: TODO: "  desc) )
 #elif defined(__GNUG__)
 	#define DO_PRAGMA(x) _Pragma (#x)
 	#define TODO(desc) DO_PRAGMA(message "TODO: " desc)
