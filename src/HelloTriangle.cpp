@@ -1,4 +1,4 @@
-// Vulkan hello world triangle rendering demo
+// Vulkan hello world triangle rendering demo with MSAA
 
 
 // Global header settings
@@ -45,7 +45,7 @@ using std::vector;
 // Config
 //////////////////////////////////////////////////////////////////////////////////
 
-const char appName[] = u8"Hello Vulkan Triangle";
+const char appName[] = u8"Hello Vulkan Triangle -- MSAA";
 
 // layers and debug
 #if VULKAN_VALIDATION
@@ -75,6 +75,8 @@ constexpr uint32_t initialWindowHeight = 800;
 //constexpr VkPresentModeKHR presentMode = VK_PRESENT_MODE_IMMEDIATE_KHR; // better not be used often because of coil whine
 constexpr VkPresentModeKHR presentMode = VK_PRESENT_MODE_FIFO_KHR;
 //constexpr VkPresentModeKHR presentMode = VK_PRESENT_MODE_MAILBOX_KHR;
+
+const VkSampleCountFlagBits sampleCount = VK_SAMPLE_COUNT_8_BIT;
 
 // pipeline settings
 constexpr VkClearValue clearColor = {  { {0.1f, 0.1f, 0.1f, 1.0f} }  };
@@ -172,7 +174,8 @@ void killRenderPass( VkDevice device, VkRenderPass renderPass );
 vector<VkFramebuffer> initFramebuffers(
 	VkDevice device,
 	VkRenderPass renderPass,
-	vector<VkImageView> imageViews,
+	VkImageView multisampleView,
+	vector<VkImageView> resolveViews,
 	uint32_t width, uint32_t height
 );
 void killFramebuffers( VkDevice device, vector<VkFramebuffer>& framebuffers );
@@ -375,6 +378,11 @@ int helloTriangle() try{
 	// place-holder swapchain dependent objects
 	VkSwapchainKHR swapchain = VK_NULL_HANDLE; // has to be NULL -- signifies that there's no swapchain
 	vector<VkImageView> swapchainImageViews;
+
+	VkImage frameImage = VK_NULL_HANDLE;
+	VkDeviceMemory frameMemory = VK_NULL_HANDLE;
+	VkImageView frameImageView = VK_NULL_HANDLE;
+
 	vector<VkFramebuffer> framebuffers;
 
 	VkPipeline pipeline = VK_NULL_HANDLE; // has to be NULL for the case the app ends before even first swapchain
@@ -433,6 +441,9 @@ int helloTriangle() try{
 
 			killPipeline( device, pipeline );
 			killFramebuffers( device, framebuffers );
+			killImageView( device, frameImageView );
+			killMemory( device, frameMemory );
+			killImage( device, frameImage );
 			killSwapchainImageViews( device, swapchainImageViews );
 
 			// kill oldSwapchain later, after it is potentially used by vkCreateSwapchainKHR
@@ -445,7 +456,12 @@ int helloTriangle() try{
 
 			vector<VkImage> swapchainImages = enumerate<VkImage>( device, swapchain );
 			swapchainImageViews = initSwapchainImageViews( device, swapchainImages, surfaceFormat.format );
-			framebuffers = initFramebuffers( device, renderPass, swapchainImageViews, surfaceSize.width, surfaceSize.height );
+
+			frameImage = initImage( device, surfaceFormat.format, surfaceSize.width, surfaceSize.height, ::sampleCount, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT );
+			frameMemory = initMemory<ResourceType::Image>( device, physicalDeviceMemoryProperties, frameImage, {VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT} );
+			frameImageView = initImageView( device, frameImage, surfaceFormat.format );
+
+			framebuffers = initFramebuffers( device, renderPass, frameImageView, swapchainImageViews, surfaceSize.width, surfaceSize.height );
 
 			pipeline = initPipeline(
 				device,
@@ -552,6 +568,10 @@ int helloTriangle() try{
 	killPipeline( device, pipeline );
 
 	killFramebuffers( device, framebuffers );
+
+	killImageView( device, frameImageView );
+	killMemory( device, frameMemory );
+	killImage( device, frameImage );
 
 	killSwapchainImageViews( device, swapchainImageViews );
 	killSwapchain( device, swapchain );
@@ -1304,8 +1324,22 @@ VkRenderPass initRenderPass( VkDevice device, VkSurfaceFormatKHR surfaceFormat )
 	VkAttachmentDescription colorAtachment{
 		0, // flags
 		surfaceFormat.format,
+		::sampleCount,
+		VK_ATTACHMENT_LOAD_OP_CLEAR,
+		// needed only for the resolve inside subpass
+		VK_ATTACHMENT_STORE_OP_DONT_CARE, // color + depth
+		VK_ATTACHMENT_LOAD_OP_DONT_CARE, // stencil
+		VK_ATTACHMENT_STORE_OP_DONT_CARE, // stencil
+		VK_IMAGE_LAYOUT_UNDEFINED,
+		VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
+	};
+
+
+	VkAttachmentDescription resolveAtachment{
+		0, // flags
+		surfaceFormat.format,
 		VK_SAMPLE_COUNT_1_BIT,
-		VK_ATTACHMENT_LOAD_OP_CLEAR, // color + depth
+		VK_ATTACHMENT_LOAD_OP_DONT_CARE, // color + depth
 		VK_ATTACHMENT_STORE_OP_STORE, // color + depth
 		VK_ATTACHMENT_LOAD_OP_DONT_CARE, // stencil
 		VK_ATTACHMENT_STORE_OP_DONT_CARE, // stencil
@@ -1318,6 +1352,12 @@ VkRenderPass initRenderPass( VkDevice device, VkSurfaceFormatKHR surfaceFormat )
 		VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
 	};
 
+	VkAttachmentReference resolveReference{
+		1, // attachment
+		// resolve attachment also does use color layout!
+		VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
+	};
+
 	VkSubpassDescription subpass{
 		0, // flags - reserved for future use
 		VK_PIPELINE_BIND_POINT_GRAPHICS,
@@ -1325,7 +1365,7 @@ VkRenderPass initRenderPass( VkDevice device, VkSurfaceFormatKHR surfaceFormat )
 		nullptr, // input attachments
 		1, // color attachment count
 		&colorReference, // color attachments
-		nullptr, // resolve attachments
+		&resolveReference, // resolve attachments
 		nullptr, // depth stencil attachment
 		0, // preserve attachment count
 		nullptr // preserve attachments
@@ -1353,13 +1393,14 @@ VkRenderPass initRenderPass( VkDevice device, VkSurfaceFormatKHR surfaceFormat )
 	};
 
 	VkSubpassDependency dependencies[] = {srcDependency, dstDependency};
+	VkAttachmentDescription attachments[] = {colorAtachment, resolveAtachment};
 
 	VkRenderPassCreateInfo renderPassInfo{
 		VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
 		nullptr, // pNext
 		0, // flags - reserved for future use
-		1, // attachment count
-		&colorAtachment, // attachments
+		2, // attachment count
+		attachments, // attachments
 		1, // subpass count
 		&subpass, // subpasses
 		2, // dependency count
@@ -1379,19 +1420,22 @@ void killRenderPass( VkDevice device, VkRenderPass renderPass ){
 vector<VkFramebuffer> initFramebuffers(
 	VkDevice device,
 	VkRenderPass renderPass,
-	vector<VkImageView> imageViews,
+	VkImageView multisampleView,
+	vector<VkImageView> resolveViews,
 	uint32_t width, uint32_t height
 ){
 	vector<VkFramebuffer> framebuffers;
 
-	for( auto imageView : imageViews ){
+	for( auto resolveView : resolveViews ){
+		VkImageView attachments[] = {multisampleView, resolveView};
+
 		VkFramebufferCreateInfo framebufferInfo{
 			VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
 			nullptr, // pNext
 			0, // flags - reserved for future use
 			renderPass,
-			1, // ImageView count
-			&imageView,
+			2, // ImageView count
+			attachments,
 			width, // width
 			height, // height
 			1 // layers
@@ -1651,7 +1695,7 @@ VkPipeline initPipeline(
 		VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO,
 		nullptr, // pNext
 		0, // flags - reserved for future use
-		VK_SAMPLE_COUNT_1_BIT,
+		::sampleCount,
 		VK_FALSE, // no sample shading
 		0.0f, // min sample shading - ignored if disabled
 		nullptr, // sample mask
