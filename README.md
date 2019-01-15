@@ -69,6 +69,7 @@ Files
 | src/LeanWindowsEnvironment.h | Included conditionally by `VulkanEnvironment.h` and includes lean `windows.h` header |
 | src/Vertex.h | Just simple Vertex definitions |
 | src/VulkanEnvironment.h | Includes `vulkan.h` and the necessary platform headers |
+| src/VulkanReflection.h | Reflection of Vulkan; e.g. convert VK enumerants to strings |
 | src/Wsi.h | Meta-header choosing one of the platforms in WSI directory |
 | src/WSI/Glfw.h | WSI platform-dependent stuff via GLFW3 library |
 | src/WSI/Win32.h | WSI Win32 platform-dependent stuff |
