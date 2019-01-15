@@ -13,6 +13,7 @@
 #include <cassert>
 #include <cmath>
 #include <cstdlib>
+#include <cstring>
 #include <algorithm>
 #include <exception>
 #include <fstream>
@@ -44,16 +45,21 @@ using std::vector;
 
 // layers and debug
 #if VULKAN_VALIDATION
-	constexpr VkDebugReportFlagsEXT debugAmount =
+	constexpr VkDebugUtilsMessageSeverityFlagsEXT debugSeverity =
 		0
-		//| VK_DEBUG_REPORT_INFORMATION_BIT_EXT
-		| VK_DEBUG_REPORT_WARNING_BIT_EXT
-		| VK_DEBUG_REPORT_PERFORMANCE_WARNING_BIT_EXT
-		| VK_DEBUG_REPORT_ERROR_BIT_EXT
-		//| VK_DEBUG_REPORT_DEBUG_BIT_EXT
+		//| VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT
+		//| VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT
+		| VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT
+		| VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT
+	;
+	constexpr VkDebugUtilsMessageTypeFlagsEXT debugType =
+		0
+		| VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT
+		| VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT
+		| VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT
 	;
 
-	constexpr bool useAssistantLayer = true;
+	constexpr bool useAssistantLayer = false;
 #endif
 
 constexpr bool fpsCounter = true;
@@ -73,6 +79,7 @@ constexpr VkClearValue clearColor = {  { {0.1f, 0.1f, 0.1f, 1.0f} }  };
 //////////////////////////////////////////////////////////////////////////////////
 
 bool isLayerSupported( const char* layer, const vector<VkLayerProperties>& supportedLayers );
+bool isExtensionSupported( const char* extension, const vector<VkExtensionProperties>& supportedExtensions );
 // treat layers as optional; app can always run without em -- i.e. return those supported
 vector<const char*> checkInstanceLayerSupport( const vector<const char*>& requestedLayers, const vector<VkLayerProperties>& supportedLayers );
 vector<VkExtensionProperties> getSupportedInstanceExtensions( const vector<const char*>& providingLayers );
@@ -221,6 +228,7 @@ int helloTriangle() try{
 
 	const auto supportedLayers = enumerate<VkLayerProperties>();
 	vector<const char*> requestedLayers;
+
 #if VULKAN_VALIDATION
 	if(  isLayerSupported( "VK_LAYER_LUNARG_standard_validation", supportedLayers )  ) requestedLayers.push_back( "VK_LAYER_LUNARG_standard_validation" );
 	else throw "VULKAN_VALIDATION is enabled but VK_LAYER_LUNARG_standard_validation layers are not supported!";
@@ -230,30 +238,64 @@ int helloTriangle() try{
 		else throw "VULKAN_VALIDATION is enabled but VK_LAYER_LUNARG_assistant_layer layer is not supported!";
 	}
 #endif
+
 	if( ::fpsCounter ) requestedLayers.push_back( "VK_LAYER_LUNARG_monitor" );
 	requestedLayers = checkInstanceLayerSupport( requestedLayers, supportedLayers );
 
 
 	const auto supportedInstanceExtensions = getSupportedInstanceExtensions( requestedLayers );
 	const auto platformSurfaceExtension = getPlatformSurfaceExtensionName();
-	const vector<const char*> requestedInstanceExtensions = {
-#if VULKAN_VALIDATION
-		VK_EXT_DEBUG_REPORT_EXTENSION_NAME,
-#endif
+	vector<const char*> requestedInstanceExtensions = {
 		VK_KHR_SURFACE_EXTENSION_NAME,
 		platformSurfaceExtension.c_str()
 	};
+
+#if VULKAN_VALIDATION
+	DebugObjectVariant::DebugObjectTag debugExtensionTag;
+	if(  isExtensionSupported( VK_EXT_DEBUG_UTILS_EXTENSION_NAME, supportedInstanceExtensions )  ){
+		debugExtensionTag = DebugObjectVariant::debugUtilsType;
+		requestedInstanceExtensions.push_back( VK_EXT_DEBUG_UTILS_EXTENSION_NAME );
+	}
+	else if(  isExtensionSupported( VK_EXT_DEBUG_REPORT_EXTENSION_NAME, supportedInstanceExtensions )  ){
+		debugExtensionTag = DebugObjectVariant::debugReportType;
+		requestedInstanceExtensions.push_back( VK_EXT_DEBUG_REPORT_EXTENSION_NAME );
+	}
+	else throw "VULKAN_VALIDATION is enabled but neither VK_EXT_debug_utils nor VK_EXT_debug_report extension is supported!";
+#endif
+
 	checkExtensionSupport( requestedInstanceExtensions, supportedInstanceExtensions );
 
 
 	const VkInstance instance = initInstance( requestedLayers, requestedInstanceExtensions );
 
 #if VULKAN_VALIDATION
-	const VkDebugReportCallbackEXT debug = initDebug( instance, ::debugAmount );
+	const auto debugHandle = initDebug( instance, debugExtensionTag, ::debugSeverity, ::debugType );
 
 	const int32_t uncoded = 0;
-	vkDebugReportMessageEXT( instance, VK_DEBUG_REPORT_PERFORMANCE_WARNING_BIT_EXT, VK_DEBUG_REPORT_OBJECT_TYPE_INSTANCE_EXT, (uint64_t)instance, __LINE__, uncoded, "Application",
-	                         "Validation Layers are enabled!" );
+	const char* introMsg = "Validation Layers are enabled!";
+	if( debugExtensionTag == DebugObjectVariant::debugUtilsType ){
+		VkDebugUtilsObjectNameInfoEXT object = {
+			VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT,
+			nullptr, // pNext
+			VK_OBJECT_TYPE_INSTANCE,
+			handleToUint64(instance),
+			"instance"
+		};
+		const VkDebugUtilsMessengerCallbackDataEXT dumcd = {
+			VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CALLBACK_DATA_EXT,
+			nullptr, // pNext
+			0, // flags
+			"VULKAN_VALIDATION", // VUID
+			0, // VUID hash
+			introMsg,
+			0, nullptr, 0, nullptr,
+			1, &object
+		};
+		vkSubmitDebugUtilsMessageEXT( instance, VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT, VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT, &dumcd );
+	}
+	else if( debugExtensionTag == DebugObjectVariant::debugReportType ){
+		vkDebugReportMessageEXT( instance, VK_DEBUG_REPORT_PERFORMANCE_WARNING_BIT_EXT, VK_DEBUG_REPORT_OBJECT_TYPE_INSTANCE_EXT, (uint64_t)instance, __LINE__, uncoded, "Application", introMsg );
+	}
 #endif
 
 
@@ -476,7 +518,7 @@ int helloTriangle() try{
 	killWindow( window );
 
 #if VULKAN_VALIDATION
-	killDebug( instance, debug );
+	killDebug( instance, debugHandle );
 #endif
 	killInstance( instance );
 
@@ -527,6 +569,14 @@ bool isLayerSupported( const char* layer, const vector<VkLayerProperties>& suppo
 	return std::any_of( supportedLayers.begin(), supportedLayers.end(), isSupportedPred );
 }
 
+bool isExtensionSupported( const char* extension, const vector<VkExtensionProperties>& supportedExtensions ){
+	const auto isSupportedPred = [extension]( const VkExtensionProperties& prop ) -> bool{
+		return std::strcmp( extension, prop.extensionName ) == 0;
+	};
+
+	return std::any_of( supportedExtensions.begin(), supportedExtensions.end(), isSupportedPred );
+}
+
 vector<const char*> checkInstanceLayerSupport( const vector<const char*>& requestedLayers, const vector<VkLayerProperties>& supportedLayers ){
 	vector<const char*> compiledLayerList;
 
@@ -564,14 +614,6 @@ vector<VkExtensionProperties> getSupportedDeviceExtensions( const VkPhysicalDevi
 	return supportedExtensions;
 }
 
-bool isExtensionSupported( const char* extension, const vector<VkExtensionProperties>& supportedExtensions ){
-	const auto isSupportedPred = [extension]( const VkExtensionProperties& prop ) -> bool{
-		return std::strcmp( extension, prop.extensionName ) == 0;
-	};
-
-	return std::any_of( supportedExtensions.begin(), supportedExtensions.end(), isSupportedPred );
-}
-
 bool checkExtensionSupport( const vector<const char*>& extensions, const vector<VkExtensionProperties>& supportedExtensions ){
 	bool allSupported = true;
 
@@ -589,7 +631,6 @@ bool checkDeviceExtensionSupport( const VkPhysicalDevice physDevice, const vecto
 	return checkExtensionSupport(  extensions, getSupportedDeviceExtensions( physDevice, providingLayers )  );
 }
 
-
 VkInstance initInstance( const vector<const char*>& layers, const vector<const char*>& extensions ){
 	const VkApplicationInfo appInfo = {
 		VK_STRUCTURE_TYPE_APPLICATION_INFO,
@@ -603,19 +644,34 @@ VkInstance initInstance( const vector<const char*>& layers, const vector<const c
 
 #if VULKAN_VALIDATION
 	// in effect during vkCreateInstance and vkDestroyInstance duration (because callback object cannot be created without instance)
-	const VkDebugReportCallbackCreateInfoEXT debugCreateInfo{
+	const VkDebugReportCallbackCreateInfoEXT debugReportCreateInfo{
 		VK_STRUCTURE_TYPE_DEBUG_REPORT_CALLBACK_CREATE_INFO_EXT,
 		nullptr, // pNext
-		::debugAmount,
-		::genericDebugCallback,
+		translateFlags( ::debugSeverity, ::debugType ),
+		::genericDebugReportCallback,
 		nullptr // pUserData
 	};
+
+	const VkDebugUtilsMessengerCreateInfoEXT debugUtilsCreateInfo = {
+		VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT,
+		nullptr, // pNext
+		0, // flags
+		debugSeverity,
+		debugType,
+		::genericDebugUtilsCallback,
+		nullptr // pUserData
+	};
+
+	bool debugUtils = std::find_if( extensions.begin(), extensions.end(), [](const char* e){ return std::strcmp( e, VK_EXT_DEBUG_UTILS_EXTENSION_NAME ) == 0; } ) != extensions.end();
+	bool debugReport = std::find_if( extensions.begin(), extensions.end(), [](const char* e){ return std::strcmp( e, VK_EXT_DEBUG_REPORT_EXTENSION_NAME ) == 0; } ) != extensions.end();
+	if( !debugUtils && !debugReport ) throw "VULKAN_VALIDATION is enabled but neither VK_EXT_debug_utils nor VK_EXT_debug_report extension is being enabled!";
+	const void* debugpNext = debugUtils ? (void*)&debugUtilsCreateInfo : (void*)&debugReportCreateInfo;
 #endif
 
 	const VkInstanceCreateInfo instanceInfo{
 		VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
 #if VULKAN_VALIDATION
-		&debugCreateInfo,
+		debugpNext,
 #else
 		nullptr, // pNext
 #endif
