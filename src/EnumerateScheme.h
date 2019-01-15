@@ -11,6 +11,7 @@
 
 #include <vulkan/vulkan.h>
 
+#include "CompilerMessages.h"
 #include "ErrorHandling.h"
 
 // the enumeration scheme
