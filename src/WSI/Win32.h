@@ -5,6 +5,7 @@
 
 #include <functional>
 #include <string>
+#include <vector>
 
 #include <Windows.h>
 #include <vulkan/vulkan.h>
@@ -22,7 +23,7 @@ int messageLoop( PlatformWindow window );
 
 bool platformPresentationSupport( VkInstance instance, VkPhysicalDevice device, uint32_t queueFamilyIndex, PlatformWindow window );
 
-PlatformWindow initWindow( int canvasWidth, int canvasHeight );
+PlatformWindow initWindow( const std::string& name, int canvasWidth, int canvasHeight );
 void killWindow( PlatformWindow window );
 
 VkSurfaceKHR initSurface( VkInstance instance, PlatformWindow window );
@@ -156,9 +157,14 @@ ATOM initWindowClass(){
 	return classAtom;
 }
 
-PlatformWindow initWindow( int canvasWidth, int canvasHeight ){
+PlatformWindow initWindow( const std::string& name, int canvasWidth, int canvasHeight ){
 	using std::string;
 	using std::to_string;
+
+	const string title = name + " -- Win32";
+	const auto titleU16Size = MultiByteToWideChar( CP_UTF8, 0, title.c_str(), -1, nullptr, 0 );
+	std::vector<wchar_t> titleU16( titleU16Size );
+	const auto success = MultiByteToWideChar( CP_UTF8, 0, title.c_str(), -1, titleU16.data(), titleU16Size );
 
 	HINSTANCE hInstance = GetModuleHandleW( NULL );
 
@@ -176,7 +182,7 @@ PlatformWindow initWindow( int canvasWidth, int canvasHeight ){
 	HWND hWnd =  CreateWindowExW(
 		exStyle,
 		MAKEINTATOM(wndClassAtom),
-		TEXT("Hello Vulkan Triangle -- Win32"),
+		titleU16.data(),
 		style,
 		CW_USEDEFAULT, CW_USEDEFAULT,
 		windowRect.right - windowRect.left, windowRect.bottom - windowRect.top,

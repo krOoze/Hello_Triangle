@@ -43,6 +43,8 @@ using std::vector;
 // Config
 //////////////////////////////////////////////////////////////////////////////////
 
+const char appName[] = u8"Hello Vulkan Triangle";
+
 // layers and debug
 #if VULKAN_VALIDATION
 	constexpr VkDebugUtilsMessageSeverityFlagsEXT debugSeverity =
@@ -299,7 +301,7 @@ int helloTriangle() try{
 #endif
 
 
-	const PlatformWindow window = initWindow( ::initialWindowWidth, ::initialWindowHeight );
+	const PlatformWindow window = initWindow( ::appName, ::initialWindowWidth, ::initialWindowHeight );
 	const VkSurfaceKHR surface = initSurface( instance, window );
 
 	const VkPhysicalDevice physicalDevice = getPhysicalDevice( instance, surface );
@@ -635,7 +637,7 @@ VkInstance initInstance( const vector<const char*>& layers, const vector<const c
 	const VkApplicationInfo appInfo = {
 		VK_STRUCTURE_TYPE_APPLICATION_INFO,
 		nullptr, // pNext
-		u8"Hello Vulkan Triangle", // Nice to meetcha, and what's your name driver?
+		::appName, // Nice to meetcha, and what's your name driver?
 		0, // app version
 		nullptr, // engine name
 		0, // engine version

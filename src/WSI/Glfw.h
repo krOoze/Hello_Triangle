@@ -25,7 +25,7 @@ int messageLoop( PlatformWindow window );
 
 bool platformPresentationSupport( VkInstance instance, VkPhysicalDevice device, uint32_t queueFamilyIndex, PlatformWindow window );
 
-PlatformWindow initWindow( int canvasWidth, int canvasHeight );
+PlatformWindow initWindow( const std::string& name, int canvasWidth, int canvasHeight );
 void killWindow( PlatformWindow window );
 
 VkSurfaceKHR initSurface( VkInstance instance, PlatformWindow window );
@@ -216,10 +216,12 @@ bool platformPresentationSupport( VkInstance instance, VkPhysicalDevice device, 
 	return glfwGetPhysicalDevicePresentationSupport( instance, device, queueFamilyIndex ) == GLFW_TRUE;
 }
 
-PlatformWindow initWindow( const int canvasWidth, const int canvasHeight ){
+PlatformWindow initWindow( const std::string& name, const int canvasWidth, const int canvasHeight ){
+	std::string title = name + " -- GLFW";
+
 	glfwWindowHint( GLFW_CLIENT_API, GLFW_NO_API );
 	glfwWindowHint( GLFW_VISIBLE, GLFW_FALSE );
-	GLFWwindow* window = glfwCreateWindow( canvasWidth, canvasHeight, "Hello Vulkan Triangle -- GLFW", NULL, NULL );
+	GLFWwindow* window = glfwCreateWindow( canvasWidth, canvasHeight, title.c_str(), NULL, NULL );
 
 	if( !window ) throw "Trouble creating GLFW window!";
 

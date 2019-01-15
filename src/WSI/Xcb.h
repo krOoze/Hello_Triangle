@@ -26,7 +26,7 @@ int messageLoop( PlatformWindow window );
 
 bool platformPresentationSupport( VkInstance instance, VkPhysicalDevice device, uint32_t queueFamilyIndex, PlatformWindow window );
 
-PlatformWindow initWindow( int canvasWidth, int canvasHeight );
+PlatformWindow initWindow( const std::string& name, int canvasWidth, int canvasHeight );
 void killWindow( PlatformWindow window );
 
 VkSurfaceKHR initSurface( VkInstance instance, PlatformWindow window );
@@ -172,7 +172,7 @@ void killXcbConnection( xcb_connection_t* connection ){
 	xcb_disconnect( connection );
 }
 
-PlatformWindow initWindow( int canvasWidth, int canvasHeight ){
+PlatformWindow initWindow( const std::string& name, int canvasWidth, int canvasHeight ){
 	xcb_connection_t* connection = initXcbConnection();
 
 	xcb_screen_t* screen = xcb_setup_roots_iterator(  xcb_get_setup( connection )  ).data;
@@ -215,10 +215,10 @@ PlatformWindow initWindow( int canvasWidth, int canvasHeight ){
 		values
 	); 
 
-	const char* title = "Hello Vulkan Triangle";
+	std::string title = name + " -- XCB";
 
-  	xcb_change_property(  connection, XCB_PROP_MODE_REPLACE, window, XCB_ATOM_WM_NAME, XCB_ATOM_STRING, 8, strlen( title ), title  );
-  	xcb_change_property(  connection, XCB_PROP_MODE_REPLACE, window, XCB_ATOM_WM_ICON_NAME, XCB_ATOM_STRING, 8, strlen( title ), title  );
+	xcb_change_property(  connection, XCB_PROP_MODE_REPLACE, window, XCB_ATOM_WM_NAME, XCB_ATOM_STRING, 8, title.size(), title.c_str()  );
+	xcb_change_property(  connection, XCB_PROP_MODE_REPLACE, window, XCB_ATOM_WM_ICON_NAME, XCB_ATOM_STRING, 8, title.size(), title.c_str()  );
 
 
 	xcb_intern_atom_cookie_t wmprotCookie = xcb_intern_atom( connection, 1, 12, "WM_PROTOCOLS" );

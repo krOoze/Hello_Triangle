@@ -21,7 +21,7 @@ struct PlatformWindow{ Display* display; Window window; VisualID visual_id; };
 
 std::string getPlatformSurfaceExtensionName(){ return VK_KHR_XLIB_SURFACE_EXTENSION_NAME; };
 
-PlatformWindow initWindow( int canvasWidth, int canvasHeight );
+PlatformWindow initWindow( const std::string& name, int canvasWidth, int canvasHeight );
 void killWindow( PlatformWindow window );
 
 bool platformPresentationSupport( VkInstance instance, VkPhysicalDevice device, uint32_t queueFamilyIndex, PlatformWindow window );
@@ -63,7 +63,7 @@ void killXlibDisplay( Display* display ){
 	XCloseDisplay( display );
 }
 
-PlatformWindow initWindow( int canvasWidth, int canvasHeight ){
+PlatformWindow initWindow( const std::string& name, int canvasWidth, int canvasHeight ){
 	Display* display = initXlibDisplay();
 
 	XLockDisplay( display );
@@ -112,10 +112,10 @@ PlatformWindow initWindow( int canvasWidth, int canvasHeight ){
 			&values
 		); 
 
-		const char* title = "Hello Vulkan Triangle";
+		const std::string title = name + " -- Xlib";
 
-		XStoreName( display, window, title );
-		XSetIconName( display, window, title );
+		XStoreName( display, window, title.c_str() );
+		XSetIconName( display, window, title.c_str() );
 
 		Atom WM_DELETE_WINDOW = XInternAtom( display, "WM_DELETE_WINDOW", False );
 		XSetWMProtocols( display, window, &WM_DELETE_WINDOW, 1 );
