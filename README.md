@@ -26,10 +26,10 @@ changes.
 
 | branch | diff link | description |
 |---|---|---|
-| `master`| -- | Your regular Hello Triangle app, and base for the others
-| `MSAA`  | [diff](https://github.com/krOoze/Hello_Triangle/compare/MSAA) | Antialiasing (i.e. Vulkan's multisample image resolve) |
-| `queue_transfer` | [diff](https://github.com/krOoze/Hello_Triangle/compare/queue_transfer) | Transfer of `EXCLUSIVE` image between queue families (separate graphics and compute queue family) |
-| `vertex_offset` | [diff](https://github.com/krOoze/Hello_Triangle/compare/vertex_offset) | Demonstrates how offset in `vkCmdBindVertexBuffers()` works |
+| [master](https://github.com/krOoze/Hello_Triangle/tree/master)| -- | Your regular Hello Triangle app, and base for the others
+| [MSAA](https://github.com/krOoze/Hello_Triangle/tree/MSAA)  | [diff](https://github.com/krOoze/Hello_Triangle/compare/MSAA) | Antialiasing (i.e. Vulkan's multisample image resolve) |
+| [queue_transfer](https://github.com/krOoze/Hello_Triangle/tree/queue_transfer) | [diff](https://github.com/krOoze/Hello_Triangle/compare/queue_transfer) | Transfer of `EXCLUSIVE` image between queue families (separate graphics and compute queue family) |
+| [vertex_offset](https://github.com/krOoze/Hello_Triangle/tree/vertex_offset) | [diff](https://github.com/krOoze/Hello_Triangle/compare/vertex_offset) | Demonstrates how offset in `vkCmdBindVertexBuffers()` works |
 
 Proper renderloop synchronization mini-tutorial
 -------------------------------------
