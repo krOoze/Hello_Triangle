@@ -16,6 +16,13 @@ in reasonably efficient way (as it was meant to be used). Well, at least that is
 the goal (i.e to have at least for this elementary case a flawless enough
 application).
 
+If you appriciate any of my free work or help (e.g. hosting this), you can send me some sweet sweet money:
+
+<a href="https://www.paypal.com/cgi-bin/webscr?cmd=_donations&business=6NRLHTNEP8GH8&item_name=For+Petr+Kraus+%28aka+krOoze%29+if+you+appreciate+any+of+my+work+done+for+free.&currency_code=USD&source=url">
+<img width="145" height="30" src="http://vulkan.hys.cz/donate.png" alt="Donate $ to krOoze" /></a>
+<a href="https://www.paypal.com/cgi-bin/webscr?cmd=_donations&business=6NRLHTNEP8GH8&item_name=For+Petr+Kraus+%28aka+krOoze%29+if+you+appreciate+any+of+my+work+done+for+free.&currency_code=EUR&source=url">
+<img width="145" height="30" src="http://vulkan.hys.cz/donateEur.png" alt="Donate € to krOoze" /></a>
+
 Branches
 -----------------
 
