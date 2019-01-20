@@ -192,6 +192,9 @@ void killSemaphore( VkDevice device, VkSemaphore semaphore );
 VkCommandPool initCommandPool( VkDevice device, const uint32_t queueFamily );
 void killCommandPool( VkDevice device, VkCommandPool commandPool );
 
+vector<VkFence> initFences( VkDevice device, size_t count, VkFenceCreateFlags flags = 0 );
+void killFences( VkDevice device, vector<VkFence>& fences );
+
 void acquireCommandBuffers( VkDevice device, VkCommandPool commandPool, uint32_t count, vector<VkCommandBuffer>& commandBuffers );
 void beginCommandBuffer( VkCommandBuffer commandBuffer );
 void endCommandBuffer( VkCommandBuffer commandBuffer );
@@ -338,7 +341,7 @@ int helloTriangle() try{
 		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
 	);
-	setVertexData( device, vertexBufferMemory, triangle );
+	setVertexData( device, vertexBufferMemory, triangle ); // Writes throug memory map. Synchronization is implicit for any subsequent vkQueueSubmit batches.
 
 	VkCommandPool commandPool = initCommandPool( device, queueFamily );
 
@@ -358,13 +361,16 @@ int helloTriangle() try{
 	VkSemaphore renderDoneS = VK_NULL_HANDLE; // has to be NULL for the case the app ends before even first swapchain
 
 	// workaround for validation layer "leak" + might also help driver to cleanup old resources
-	// this should not happen for real-word app, because they are likely to use fences naturaly (e.g. user input reaction)
+	// this should not be needed for real-word app, because they are likely to use fences naturaly (e.g. user input reaction)
 	// read https://github.com/KhronosGroup/Vulkan-LoaderAndValidationLayers/issues/1628
-	const uint32_t maxInflightSubmissions = 60;
-	uint32_t inflightSubmissions = 0;
+	const uint32_t maxInflightSubmissions = 2; // more than 2 probably does not make much sense
+	uint32_t submissionNr = 0; // index of the current submission modulo maxInflightSubmission
+	vector<VkFence> submissionFences;
+
 
 	const std::function<bool(void)> recreateSwapchain = [&](){
 		// swapchain recreation -- will be done before the first frame too;
+		TODO( "This may be triggered from many sources (e.g. WM_SIZE event, and VK_ERROR_OUT_OF_DATE_KHR too). Should prevent duplicate swapchain recreation." )
 
 		VkSurfaceCapabilitiesKHR capabilities = getSurfaceCapabilities( physicalDevice, surface );
 		VkExtent2D surfaceSize = {
@@ -384,9 +390,11 @@ int helloTriangle() try{
 		// cleanup old
 		if( swapchain ){
 			{VkResult errorCode = vkDeviceWaitIdle( device ); RESULT_HANDLER( errorCode, "vkDeviceWaitIdle" );}
-			inflightSubmissions = 0;
 
-			// semafores might be in signaled state, so kill them too to get fresh unsignaled
+			// fences might be in unsignaled state, so kill them too to get fresh signaled
+			killFences( device, submissionFences );
+
+			// semaphores might be in signaled state, so kill them too to get fresh unsignaled
 			killSemaphore( device, renderDoneS );
 			killSemaphore( device, imageReadyS );
 
@@ -440,6 +448,9 @@ int helloTriangle() try{
 
 			imageReadyS = initSemaphore( device );
 			renderDoneS = initSemaphore( device );
+
+			submissionFences = initFences( device, maxInflightSubmissions, VK_FENCE_CREATE_SIGNALED_BIT ); // signaled fence means previous execution finished, so we start rendering presignaled
+			submissionNr = 0;
 		}
 
 		return swapchain != VK_NULL_HANDLE;
@@ -451,15 +462,14 @@ int helloTriangle() try{
 		assert( swapchain ); // should be always true; should have yielded CPU if false
 
 		try{
+			// remove oldest frame from being in flight before starting new one
+			{VkResult errorCode = vkWaitForFences( device, 1, &submissionFences[submissionNr], VK_TRUE, UINT64_MAX ); RESULT_HANDLER( errorCode, "vkWaitForFences" );}
+			{VkResult errorCode = vkResetFences( device, 1, &submissionFences[submissionNr] ); RESULT_HANDLER( errorCode, "vkResetFences" );}
+
 			uint32_t nextSwapchainImageIndex = getNextImageIndex( device, swapchain, imageReadyS );
 
-			if( inflightSubmissions >= maxInflightSubmissions ){
-				vkQueueWaitIdle( queue );
-				inflightSubmissions = 0;
-			}
-
-			submitToQueue( queue, commandBuffers[nextSwapchainImageIndex], imageReadyS, renderDoneS );
-			++inflightSubmissions;
+			submitToQueue( queue, commandBuffers[nextSwapchainImageIndex], imageReadyS, renderDoneS, submissionFences[submissionNr] );
+			submissionNr = (submissionNr + 1) % maxInflightSubmissions;
 
 			present( queue, swapchain, nextSwapchainImageIndex, renderDoneS );
 		}
@@ -503,6 +513,8 @@ int helloTriangle() try{
 
 
 	// kill vulkan
+	killFences( device, submissionFences );
+
 	killCommandPool( device,  commandPool );
 
 	killMemory( device, vertexBufferMemory );
@@ -1639,7 +1651,7 @@ void killSemaphore( VkDevice device, VkSemaphore semaphore ){
 }
 
 VkCommandPool initCommandPool( VkDevice device, const uint32_t queueFamily ){
-	VkCommandPoolCreateInfo commandPoolInfo{
+	const VkCommandPoolCreateInfo commandPoolInfo{
 		VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
 		nullptr, // pNext
 		0, // flags
@@ -1653,6 +1665,32 @@ VkCommandPool initCommandPool( VkDevice device, const uint32_t queueFamily ){
 
 void killCommandPool( VkDevice device, VkCommandPool commandPool ){
 	vkDestroyCommandPool( device, commandPool, nullptr );
+}
+
+VkFence initFence( const VkDevice device, const VkFenceCreateFlags flags = 0 ){
+	const VkFenceCreateInfo fci{
+		VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
+		nullptr, // pNext
+		flags
+	};
+
+	VkFence fence;
+	VkResult errorCode = vkCreateFence( device, &fci, nullptr, &fence ); RESULT_HANDLER( errorCode, "vkCreateFence" );
+	return fence;
+}
+
+void killFence( const VkDevice device, const VkFence fence ){
+	vkDestroyFence( device, fence, nullptr );
+}
+
+vector<VkFence> initFences( const VkDevice device, const size_t count, const VkFenceCreateFlags flags ){
+	vector<VkFence> fences;
+	std::generate_n(  std::back_inserter( fences ), count, [=]{return initFence( device, flags );}  );
+	return fences;
+}
+
+void killFences( const VkDevice device, vector<VkFence>& fences ){
+	for( const auto f : fences ) killFence( device, f );
 }
 
 void acquireCommandBuffers( VkDevice device, VkCommandPool commandPool, uint32_t count, vector<VkCommandBuffer>& commandBuffers ){
