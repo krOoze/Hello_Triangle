@@ -187,7 +187,9 @@ void killPipeline( VkDevice device, VkPipeline pipeline );
 void setVertexData( VkDevice device, VkDeviceMemory memory, vector<Vertex2D_ColorF_pack> vertices );
 
 VkSemaphore initSemaphore( VkDevice device );
+vector<VkSemaphore> initSemaphores( VkDevice device, size_t count );
 void killSemaphore( VkDevice device, VkSemaphore semaphore );
+void killSemaphores( VkDevice device, vector<VkSemaphore>& semaphores );
 
 VkCommandPool initCommandPool( VkDevice device, const uint32_t queueFamily );
 void killCommandPool( VkDevice device, VkCommandPool commandPool );
@@ -357,7 +359,7 @@ int helloTriangle() try{
 	VkPipeline pipeline = VK_NULL_HANDLE; // has to be NULL for the case the app ends before even first swapchain
 	vector<VkCommandBuffer> commandBuffers;
 
-	VkSemaphore imageReadyS = VK_NULL_HANDLE; // has to be NULL for the case the app ends before even first swapchain
+	vector<VkSemaphore> imageReadySs; // has to be NULL for the case the app ends before even first swapchain
 	VkSemaphore renderDoneS = VK_NULL_HANDLE; // has to be NULL for the case the app ends before even first swapchain
 
 	// workaround for validation layer "leak" + might also help driver to cleanup old resources
@@ -396,7 +398,7 @@ int helloTriangle() try{
 
 			// semaphores might be in signaled state, so kill them too to get fresh unsignaled
 			killSemaphore( device, renderDoneS );
-			killSemaphore( device, imageReadyS );
+			killSemaphores( device, imageReadySs );
 
 			// only reset + later reuse already allocated and create new only if needed
 			{VkResult errorCode = vkResetCommandPool( device, commandPool, 0 ); RESULT_HANDLER( errorCode, "vkResetCommandPool" );}
@@ -446,7 +448,7 @@ int helloTriangle() try{
 				endCommandBuffer( commandBuffers[i] );
 			}
 
-			imageReadyS = initSemaphore( device );
+			imageReadySs = initSemaphores( device, maxInflightSubmissions );
 			renderDoneS = initSemaphore( device );
 
 			submissionFences = initFences( device, maxInflightSubmissions, VK_FENCE_CREATE_SIGNALED_BIT ); // signaled fence means previous execution finished, so we start rendering presignaled
@@ -466,9 +468,9 @@ int helloTriangle() try{
 			{VkResult errorCode = vkWaitForFences( device, 1, &submissionFences[submissionNr], VK_TRUE, UINT64_MAX ); RESULT_HANDLER( errorCode, "vkWaitForFences" );}
 			{VkResult errorCode = vkResetFences( device, 1, &submissionFences[submissionNr] ); RESULT_HANDLER( errorCode, "vkResetFences" );}
 
-			uint32_t nextSwapchainImageIndex = getNextImageIndex( device, swapchain, imageReadyS );
+			uint32_t nextSwapchainImageIndex = getNextImageIndex( device, swapchain, imageReadySs[submissionNr] );
 
-			submitToQueue( queue, commandBuffers[nextSwapchainImageIndex], imageReadyS, renderDoneS, submissionFences[submissionNr] );
+			submitToQueue( queue, commandBuffers[nextSwapchainImageIndex], imageReadySs[submissionNr], renderDoneS, submissionFences[submissionNr] );
 			submissionNr = (submissionNr + 1) % maxInflightSubmissions;
 
 			present( queue, swapchain, nextSwapchainImageIndex, renderDoneS );
@@ -500,7 +502,7 @@ int helloTriangle() try{
 
 	// kill swapchain
 	killSemaphore( device, renderDoneS );
-	killSemaphore( device, imageReadyS );
+	killSemaphores( device, imageReadySs );
 
 	// command buffers killed with pool
 
@@ -1646,8 +1648,19 @@ VkSemaphore initSemaphore( VkDevice device ){
 	return semaphore;
 }
 
+vector<VkSemaphore> initSemaphores( VkDevice device, size_t count ){
+	vector<VkSemaphore> semaphores;
+	std::generate_n(  std::back_inserter( semaphores ), count, [device]{ return initSemaphore( device ); }  );
+	return semaphores;
+}
+
 void killSemaphore( VkDevice device, VkSemaphore semaphore ){
 	vkDestroySemaphore( device, semaphore, nullptr );
+}
+
+void killSemaphores( VkDevice device, vector<VkSemaphore>& semaphores ){
+	for( const auto s : semaphores ) killSemaphore( device, s );
+	semaphores.clear();
 }
 
 VkCommandPool initCommandPool( VkDevice device, const uint32_t queueFamily ){
@@ -1691,6 +1704,7 @@ vector<VkFence> initFences( const VkDevice device, const size_t count, const VkF
 
 void killFences( const VkDevice device, vector<VkFence>& fences ){
 	for( const auto f : fences ) killFence( device, f );
+	fences.clear();
 }
 
 void acquireCommandBuffers( VkDevice device, VkCommandPool commandPool, uint32_t count, vector<VkCommandBuffer>& commandBuffers ){
