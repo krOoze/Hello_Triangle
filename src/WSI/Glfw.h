@@ -159,11 +159,11 @@ GLFWmonitor* getCurrentMonitor( GLFWwindow* window ){
 	return bestmonitor;
 }
 
-void windowSizeCallback( GLFWwindow*, int, int ){
+void windowSizeCallback( GLFWwindow*, int, int ) noexcept{
 	hasSwapchain = sizeEventHandler();
 }
 
-void windowRefreshCallback( GLFWwindow* ){
+void windowRefreshCallback( GLFWwindow* ) noexcept{
 	//logger << "refresh" << std::endl;
 	if( hasSwapchain ) paintEventHandler();
 }
@@ -190,7 +190,7 @@ void toggleFullscreen( GLFWwindow* window ){
 	}
 }
 
-void keyCallback( GLFWwindow* window, int key, int /*scancode*/, int action, int mods ){
+void keyCallback( GLFWwindow* window, int key, int /*scancode*/, int action, int mods ) noexcept{
 	if( key == GLFW_KEY_ESCAPE && action == GLFW_PRESS ) glfwSetWindowShouldClose( window, GLFW_TRUE );
 
 	if( key == GLFW_KEY_ENTER && action == GLFW_PRESS && mods == GLFW_MOD_ALT ) toggleFullscreen( window );
