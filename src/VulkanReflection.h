@@ -260,4 +260,4 @@ std::string to_string_hex( const uint64_t n ){
 	return "0x" + ss.str();
 }
 
-#endif COMMON_VULKAN_REFLECTION_H
+#endif //COMMON_VULKAN_REFLECTION_H
