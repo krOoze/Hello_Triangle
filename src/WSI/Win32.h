@@ -76,6 +76,81 @@ int messageLoop( PlatformWindow window ){
 	return static_cast<int>( msg.wParam );
 }
 
+	DWORD windowedStyle = WS_OVERLAPPEDWINDOW | WS_CLIPCHILDREN | WS_CLIPSIBLINGS;
+	DWORD windowedExStyle = WS_EX_OVERLAPPEDWINDOW;
+
+void toggleFullscreen( HWND hWnd ){
+	TODO( "All of this needs to be made a class... death to the static!" )
+	static bool isFullscreen = false;
+	static int wx = 100;
+	static int wy = 100;
+	static int ww = 800;
+	static int wh = 800;
+
+	DWORD style, exStyle;
+	int x, y, width, height;
+
+	if( !isFullscreen ){
+		windowedStyle = GetWindowLongW( hWnd, GWL_STYLE );
+		if( !windowedStyle && GetLastError() != ERROR_SUCCESS ) throw std::string( "Trouble setting window style: " ) + std::to_string( GetLastError() );
+
+		windowedExStyle = GetWindowLongW( hWnd, GWL_EXSTYLE );
+		if( !windowedExStyle && GetLastError() != ERROR_SUCCESS ) throw std::string( "Trouble setting window ex style: " ) + std::to_string( GetLastError() );
+
+		const DWORD fullscreenStyle = ::windowedStyle & ~(WS_CAPTION | WS_THICKFRAME);
+		const DWORD fullscreenExStyle = ::windowedExStyle & ~(WS_EX_DLGMODALFRAME | WS_EX_WINDOWEDGE | WS_EX_CLIENTEDGE | WS_EX_STATICEDGE);
+
+		style = fullscreenStyle;
+		exStyle = fullscreenExStyle;
+
+		MONITORINFO monitorInfo;
+		monitorInfo.cbSize = sizeof( MONITORINFO );
+		{
+			const auto succ = GetMonitorInfo(  MonitorFromWindow( hWnd, MONITOR_DEFAULTTOPRIMARY ), &monitorInfo  );
+			if( !succ ) throw std::string( "Trouble getting window monitor info: " ) + std::to_string( GetLastError() );
+		}
+		x = monitorInfo.rcMonitor.left;
+		y = monitorInfo.rcMonitor.top;
+		width = monitorInfo.rcMonitor.right - x; assert( width >= 0 );
+		height = monitorInfo.rcMonitor.bottom - y; assert( height >= 0 );
+
+		RECT wndRect;
+		{
+			const auto succ = GetWindowRect( hWnd, &wndRect );
+			if( !succ ) throw std::string( "Trouble getting window dimensions: " ) + std::to_string( GetLastError() );
+		}
+		wx = wndRect.left;
+		wy = wndRect.top;
+		ww = wndRect.right - wx;
+		wh = wndRect.bottom - wy;
+	}
+	else {
+		style = ::windowedStyle;
+		exStyle = ::windowedExStyle;
+
+		x = wx;
+		y = wy;
+		width = ww;
+		height = wh;
+	}
+
+	isFullscreen = !isFullscreen;
+
+	assert( GetLastError() == ERROR_SUCCESS );
+	{
+		const auto succ = SetWindowLongW( hWnd, GWL_STYLE, style );
+		if( !succ && GetLastError() != ERROR_SUCCESS ) throw std::string( "Trouble setting window style: " ) + std::to_string( GetLastError() );
+	}
+	{
+		const auto succ = SetWindowLongW( hWnd, GWL_EXSTYLE, exStyle );
+		if( !succ && GetLastError() != ERROR_SUCCESS ) throw std::string( "Trouble setting window ex style: " ) + std::to_string( GetLastError() );
+	}
+	{
+		const auto succ = SetWindowPos( hWnd, HWND_TOP, x, y, width, height, SWP_FRAMECHANGED | SWP_NOACTIVATE | SWP_NOCOPYBITS | SWP_NOZORDER );
+		if( !succ ) throw std::string( "Trouble resizing window to fullscreen: " ) + std::to_string( GetLastError() );
+	}
+}
+
 LRESULT CALLBACK wndProc( HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam ){
 	switch( uMsg ){
 		case WM_CLOSE:
@@ -108,11 +183,24 @@ LRESULT CALLBACK wndProc( HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam ){
 			case VK_ESCAPE:
 				PostQuitMessage( 0 );
 				return 0;
+			default:
+				return DefWindowProc( hWnd, uMsg, wParam, lParam );
 			}
-			return 0;
+
+		case WM_SYSCOMMAND:
+			switch( wParam ){
+			case SC_KEYMENU:
+				if( lParam == VK_RETURN ){ // Alt-Enter without "no sysmenu hotkey exists" beep
+					toggleFullscreen( hWnd );
+					return 0;
+				}
+				else return DefWindowProc( hWnd, uMsg, wParam, lParam );
+			default:
+				return DefWindowProc( hWnd, uMsg, wParam, lParam );
+			}
 
 		default:
-			//logger << "unknown " << to_string( uMsg ) << endl;
+			//logger << "unknown " << std::hex << std::showbase << uMsg  << std::endl;
 			return DefWindowProc( hWnd, uMsg, wParam, lParam );
 	}
 }
@@ -171,19 +259,17 @@ PlatformWindow initWindow( const std::string& name, int canvasWidth, int canvasH
 	ATOM wndClassAtom = initWindowClass();
 
 	// adjust size of window to contain given size canvas
-	DWORD style = WS_OVERLAPPEDWINDOW | WS_CLIPCHILDREN | WS_CLIPSIBLINGS;
-	DWORD exStyle = WS_EX_OVERLAPPEDWINDOW;
 	RECT windowRect = { 0, 0, canvasWidth, canvasHeight };
-	if(  !AdjustWindowRectEx( &windowRect, style, FALSE, exStyle )  ){
+	if(  !AdjustWindowRectEx( &windowRect, ::windowedStyle, FALSE, ::windowedExStyle )  ){
 		throw string( "Trouble adjusting window size: " ) + to_string( GetLastError() );
 	}
 
 	// create window instance
 	HWND hWnd =  CreateWindowExW(
-		exStyle,
+		::windowedExStyle,
 		MAKEINTATOM(wndClassAtom),
 		titleU16.data(),
-		style,
+		::windowedStyle,
 		CW_USEDEFAULT, CW_USEDEFAULT,
 		windowRect.right - windowRect.left, windowRect.bottom - windowRect.top,
 		NULL,
