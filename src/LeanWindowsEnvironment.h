@@ -20,7 +20,7 @@
 #define NOMENUS
 //#define NOICONS // need icons to create window
 #define NOKEYSTATES
-#define NOSYSCOMMANDS
+//#define NOSYSCOMMANDS // need to manage LAlt key events
 #define NORASTEROPS
 //#define NOSHOWWINDOW // need to show windows
 #define OEMRESOURCE
@@ -44,7 +44,7 @@
 #define NOSOUND
 #define NOTEXTMETRIC
 #define NOWH
-#define NOWINOFFSETS
+//#define NOWINOFFSETS // need for GetWindowLongW
 #define NOCOMM
 #define NOKANJI
 #define NOHELP

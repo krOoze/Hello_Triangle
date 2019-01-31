@@ -37,6 +37,11 @@
 	#define WSI_CHOSEN_EXTERNALLY
 #endif
 
+#if defined(_WIN32) && !defined(_CONSOLE)
+	#include "LeanWindowsEnvironment.h"
+	#include <Windows.h>
+#endif
+
 // platform specific settings
 #if defined(__CYGWIN__)
 	#ifndef WSI_CHOSEN_EXTERNALLY
@@ -49,15 +54,11 @@
 		#define USE_PLATFORM_GLFW
 		//#define VK_USE_PLATFORM_WIN32_KHR
 	#endif
-	//#include "LeanWindowsEnvironment.h" // Windows.h settings must be first -- vulkan.h does include Windows.h
+	#include "LeanWindowsEnvironment.h" // Windows.h settings must be first -- vulkan.h does include Windows.h
 #elif defined(_WIN32)
 	#ifndef WSI_CHOSEN_EXTERNALLY
 		#define USE_PLATFORM_GLFW
 		//#define VK_USE_PLATFORM_WIN32_KHR
-	#endif
-	#if defined(_WIN32) && !defined(_CONSOLE)
-		#include "LeanWindowsEnvironment.h"
-		#include <Windows.h>
 	#endif
 #elif defined(__linux__)
 	#ifndef WSI_CHOSEN_EXTERNALLY
