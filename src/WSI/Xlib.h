@@ -13,8 +13,6 @@
 #include "CompilerMessages.h"
 #include "ErrorHandling.h"
 
-TODO( "Xlib crashes for me sometimes on resize on vkDestroyImageView. Driver bug?" )
-
 
 TODO( "Easier to use, but might prevent platform co-existence. Could be namespaced. Make all of this a class?" )
 struct PlatformWindow{ Display* display; Window window; VisualID visual_id; };
@@ -178,8 +176,6 @@ void showWindow( PlatformWindow window ){
 	XUnlockDisplay( window.display );
 }
 
-
-TODO( "Need to test Xlib when I get to a linux machine." )
 int messageLoop( PlatformWindow window ){
 	int width = -1;
 	int height = -1;
@@ -190,7 +186,7 @@ int messageLoop( PlatformWindow window ){
 	while( !quit ){
 		XEvent e;
 		bool hasEvent = true;
-		constexpr auto always = []( Display*, XEvent*, XPointer ) -> Bool{return true;};
+		const auto always = []( Display*, XEvent*, XPointer ) -> Bool{return true;};
 		XLockDisplay( window.display );
 			if( hasSwapchain ) hasEvent = XCheckIfEvent( window.display, &e, always, nullptr );
 			else XNextEvent( window.display, &e );
