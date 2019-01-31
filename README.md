@@ -56,8 +56,9 @@ Requirements
 **Build Environment[GLFW]**: GLFW 3.2+ (already included as a git submodule), requires `xorg-dev` package on Linux  
 **Build environment[Xlib]**: Requires `xorg-dev` package  
 **Build environment[XCB]**: Requires `libxcb1-dev`, `libxcb-util-dev`, `libxcb-keysyms1-dev`, and `x11proto-dev` packages  
+**Build environment[Wayland]**: Requires `libwayland-dev` and `libxkbcommon-dev` packages  
 **Target Environment**: installed (latest) Vulkan capable drivers (to see anything)  
-**Target Environment**: GLFW(recommended), XCB or Xlib based windowing system
+**Target Environment**: GLFW(recommended), XCB, Xlib, or Wayland based windowing system
 
 On Unix-like environment refer to [SDK docs](https://vulkan.lunarg.com/doc/sdk/latest/linux/getting_started.html) on how to set `VULKAN_SDK` variable.
 

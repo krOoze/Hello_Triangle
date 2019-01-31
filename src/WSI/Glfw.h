@@ -191,6 +191,7 @@ void toggleFullscreen( GLFWwindow* window ){
 	}
 }
 
+TODO( "Fullscreen window seem to become unresponsive in Wayland session Ubuntu" )
 void keyCallback( GLFWwindow* window, int key, int /*scancode*/, int action, int mods ) noexcept{
 	if( key == GLFW_KEY_ESCAPE && action == GLFW_PRESS ) glfwSetWindowShouldClose( window, GLFW_TRUE );
 

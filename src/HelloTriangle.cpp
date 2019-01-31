@@ -375,10 +375,12 @@ int helloTriangle() try{
 		TODO( "This may be triggered from many sources (e.g. WM_SIZE event, and VK_ERROR_OUT_OF_DATE_KHR too). Should prevent duplicate swapchain recreation." )
 
 		VkSurfaceCapabilitiesKHR capabilities = getSurfaceCapabilities( physicalDevice, surface );
-		VkExtent2D surfaceSize = {
-			capabilities.currentExtent.width == UINT32_MAX ? ::initialWindowWidth : capabilities.currentExtent.width,
-			capabilities.currentExtent.height == UINT32_MAX ? ::initialWindowHeight : capabilities.currentExtent.height,
-		};
+
+		if( capabilities.currentExtent.width == UINT32_MAX && capabilities.currentExtent.height == UINT32_MAX ){
+			capabilities.currentExtent.width = getWindowWidth( window );
+			capabilities.currentExtent.height = getWindowHeight( window );
+		}
+		VkExtent2D surfaceSize = { capabilities.currentExtent.width, capabilities.currentExtent.height };
 
 		const bool swapchainCreatable = {
 			   surfaceSize.width >= capabilities.minImageExtent.width

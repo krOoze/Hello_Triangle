@@ -3,7 +3,6 @@
 
 #if  !defined(USE_PLATFORM_GLFW) \
   && !defined(VK_USE_PLATFORM_ANDROID_KHR) \
-  && !defined(VK_USE_PLATFORM_MIR_KHR) \
   && !defined(VK_USE_PLATFORM_WAYLAND_KHR) \
   && !defined(VK_USE_PLATFORM_WIN32_KHR) \
   && !defined(VK_USE_PLATFORM_XCB_KHR) \
@@ -22,8 +21,16 @@
 	#include "WSI/Xlib.h"
 #elif defined(VK_USE_PLATFORM_XCB_KHR)
 	#include "WSI/Xcb.h"
+#elif defined(VK_USE_PLATFORM_WAYLAND_KHR)
+	#include "WSI/Wayland.h"
 #else
 	#error "Unsupported Vulkan WSI platform, or none selected."
+#endif
+
+#ifndef VK_USE_PLATFORM_WAYLAND_KHR
+// dummy impl for platforms that do not need these functions
+uint32_t getWindowWidth( PlatformWindow window ){ return 0; }
+uint32_t getWindowHeight( PlatformWindow window ){ return 0; }
 #endif
 
 #endif //HELLO_TRIANGLE_WSI_PLATFORM_H

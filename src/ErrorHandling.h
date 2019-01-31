@@ -25,6 +25,8 @@ struct VulkanResultException{
 #define RESULT_HANDLER( errorCode, source )  if( errorCode ) throw VulkanResultException( __FILE__, __LINE__, __func__, source, errorCode )
 #define RESULT_HANDLER_EX( cond, errorCode, source )  if( cond ) throw VulkanResultException( __FILE__, __LINE__, __func__, source, errorCode )
 
+#define RUNTIME_ASSERT( cond, source )  if( !(cond) ) throw source " failed";
+
 // just use cout for logging now
 std::ostream& logger = std::cout;
 

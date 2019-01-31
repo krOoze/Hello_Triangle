@@ -65,6 +65,7 @@
 		#define USE_PLATFORM_GLFW
 		//#define VK_USE_PLATFORM_XCB_KHR
 		//#define VK_USE_PLATFORM_XLIB_KHR
+		//#define VK_USE_PLATFORM_WAYLAND_KHR
 	#endif
 #else
 	//#error "Unsupported OS platform." // caught in main.cpp instead
