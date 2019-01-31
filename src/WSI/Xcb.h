@@ -26,7 +26,7 @@ int messageLoop( PlatformWindow window );
 
 bool platformPresentationSupport( VkInstance instance, VkPhysicalDevice device, uint32_t queueFamilyIndex, PlatformWindow window );
 
-PlatformWindow initWindow( const std::string& name, int canvasWidth, int canvasHeight );
+PlatformWindow initWindow( const std::string& name, uint32_t canvasWidth, uint32_t canvasHeight );
 void killWindow( PlatformWindow window );
 
 VkSurfaceKHR initSurface( VkInstance instance, PlatformWindow window );
@@ -172,7 +172,7 @@ void killXcbConnection( xcb_connection_t* connection ){
 	xcb_disconnect( connection );
 }
 
-PlatformWindow initWindow( const std::string& name, int canvasWidth, int canvasHeight ){
+PlatformWindow initWindow( const std::string& name, uint32_t canvasWidth, uint32_t canvasHeight ){
 	xcb_connection_t* connection = initXcbConnection();
 
 	xcb_screen_t* screen = xcb_setup_roots_iterator(  xcb_get_setup( connection )  ).data;

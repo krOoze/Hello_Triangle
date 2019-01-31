@@ -21,7 +21,7 @@ struct PlatformWindow{ Display* display; Window window; VisualID visual_id; };
 
 std::string getPlatformSurfaceExtensionName(){ return VK_KHR_XLIB_SURFACE_EXTENSION_NAME; };
 
-PlatformWindow initWindow( const std::string& name, int canvasWidth, int canvasHeight );
+PlatformWindow initWindow( const std::string& name, uint32_t canvasWidth, uint32_t canvasHeight );
 void killWindow( PlatformWindow window );
 
 bool platformPresentationSupport( VkInstance instance, VkPhysicalDevice device, uint32_t queueFamilyIndex, PlatformWindow window );
@@ -63,7 +63,7 @@ void killXlibDisplay( Display* display ){
 	XCloseDisplay( display );
 }
 
-PlatformWindow initWindow( const std::string& name, int canvasWidth, int canvasHeight ){
+PlatformWindow initWindow( const std::string& name, uint32_t canvasWidth, uint32_t canvasHeight ){
 	Display* display = initXlibDisplay();
 
 	XLockDisplay( display );

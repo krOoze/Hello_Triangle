@@ -23,7 +23,7 @@ int messageLoop( PlatformWindow window );
 
 bool platformPresentationSupport( VkInstance instance, VkPhysicalDevice device, uint32_t queueFamilyIndex, PlatformWindow window );
 
-PlatformWindow initWindow( const std::string& name, int canvasWidth, int canvasHeight );
+PlatformWindow initWindow( const std::string& name, uint32_t canvasWidth, uint32_t canvasHeight );
 void killWindow( PlatformWindow window );
 
 VkSurfaceKHR initSurface( VkInstance instance, PlatformWindow window );
@@ -245,7 +245,7 @@ ATOM initWindowClass(){
 	return classAtom;
 }
 
-PlatformWindow initWindow( const std::string& name, int canvasWidth, int canvasHeight ){
+PlatformWindow initWindow( const std::string& name, uint32_t canvasWidth, uint32_t canvasHeight ){
 	using std::string;
 	using std::to_string;
 
@@ -259,7 +259,7 @@ PlatformWindow initWindow( const std::string& name, int canvasWidth, int canvasH
 	ATOM wndClassAtom = initWindowClass();
 
 	// adjust size of window to contain given size canvas
-	RECT windowRect = { 0, 0, canvasWidth, canvasHeight };
+	RECT windowRect = { 0, 0, static_cast<LONG>(canvasWidth), static_cast<LONG>(canvasHeight) };
 	if(  !AdjustWindowRectEx( &windowRect, ::windowedStyle, FALSE, ::windowedExStyle )  ){
 		throw string( "Trouble adjusting window size: " ) + to_string( GetLastError() );
 	}

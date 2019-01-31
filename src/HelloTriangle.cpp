@@ -67,8 +67,8 @@ const char appName[] = u8"Hello Vulkan Triangle";
 constexpr bool fpsCounter = true;
 
 // window and swapchain
-constexpr int initialWindowWidth = 800;
-constexpr int initialWindowHeight = 800;
+constexpr uint32_t initialWindowWidth = 800;
+constexpr uint32_t initialWindowHeight = 800;
 
 //constexpr VkPresentModeKHR presentMode = VK_PRESENT_MODE_IMMEDIATE_KHR; // better not be used often because of coil whine
 constexpr VkPresentModeKHR presentMode = VK_PRESENT_MODE_FIFO_KHR;
