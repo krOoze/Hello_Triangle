@@ -1,23 +1,32 @@
 cmake_minimum_required( VERSION 3.5.1 )
 project( HelloTriangle )
 
-if( NOT DEFINED ENV{VULKAN_SDK} )
-	message( FATAL_ERROR "VULKAN_SDK not found!" )
-endif()
+set( TODO ON CACHE BOOL "Enable compiletime TODO messages" )
 
-if( CYGWIN )
-	execute_process( COMMAND cygpath "$ENV{VULKAN_SDK}" OUTPUT_VARIABLE VULKAN_SDK )
-	string( STRIP ${VULKAN_SDK} VULKAN_SDK )
-else()
-	set( VULKAN_SDK "$ENV{VULKAN_SDK}" )
+# Select WSI platform (can use cmake -D)
+set( WSI "USE_PLATFORM_GLFW" CACHE STRING "WSI type used by this app" )
+message( "WSI: " ${WSI} )
+
+# Find Vulkan SDK
+if( NOT DEFINED {VULKAN_SDK} )
+	if( NOT DEFINED ENV{VULKAN_SDK} )
+		message( FATAL_ERROR "VULKAN_SDK not found!" )
+	endif()
+
+	if( CYGWIN )
+		execute_process( COMMAND cygpath "$ENV{VULKAN_SDK}" OUTPUT_VARIABLE VULKAN_SDK )
+		string( STRIP ${VULKAN_SDK} VULKAN_SDK )
+	else()
+		set( VULKAN_SDK "$ENV{VULKAN_SDK}" )
+	endif()
 endif()
 message( "Vulkan SDK path: " ${VULKAN_SDK} )
 
-# Shaders
-set( DEBUG_FLAG $<$<CONFIG:Debug>:-g> )
-set( GLSL_COMPILER ${VULKAN_SDK}/bin/glslc -mfmt=num ${DEBUG_FLAG} )
+# Compile shaders
+set( GLSL_DEBUG_FLAG $<$<CONFIG:Debug>:-g> )
+set( GLSL_COMPILER ${VULKAN_SDK}/bin/glslc -mfmt=num ${GLSL_DEBUG_FLAG} )
 
-set(VERT_SHADER "src/shaders/hello_triangle.vert")
+set(VERT_SHADER "${CMAKE_SOURCE_DIR}/src/shaders/hello_triangle.vert")
 set(VERT_SHADER_INCLUDE ${VERT_SHADER}.spv.inl)
 add_custom_command(
 	COMMENT "Compiling vertex shader"
@@ -27,7 +36,7 @@ add_custom_command(
 	#VERBATIM -- TODO breaks empty generator-expression
 )
 
-set(FRAG_SHADER "src/shaders/hello_triangle.frag")
+set(FRAG_SHADER "${CMAKE_SOURCE_DIR}/src/shaders/hello_triangle.frag")
 set(FRAG_SHADER_INCLUDE ${FRAG_SHADER}.spv.inl)
 add_custom_command(
 	COMMENT "Compiling fragment shader"
@@ -43,25 +52,31 @@ add_custom_target(
 	DEPENDS ${VERT_SHADER_INCLUDE} ${FRAG_SHADER_INCLUDE}
 )
 
-# GLFW
-set( GLFW_BUILD_DOCS OFF CACHE BOOL "" FORCE )
-set( GLFW_BUILD_TESTS OFF CACHE BOOL "" FORCE )
-set( GLFW_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE )
+# Build GLFW
+if( ${WSI} STREQUAL "USE_PLATFORM_GLFW" )
+	set( GLFW_BUILD_DOCS OFF CACHE BOOL "" FORCE )
+	set( GLFW_BUILD_TESTS OFF CACHE BOOL "" FORCE )
+	set( GLFW_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE )
 
-if( CYGWIN )
-	# Hack to make GLFW use Win32 WSI instead of X11
-	# TODO: Might be cleaner to use cross-compiling
-	unset( UNIX )
-	set( WIN32 1 )
+	if( CYGWIN )
+		# Hack to make GLFW use Win32 WSI instead of X11
+		# TODO: Might be cleaner to use cross-compiling
+		unset( UNIX )
+		set( WIN32 1 )
+	endif()
+
+	add_subdirectory( external/glfw )
 endif()
-
-add_subdirectory( external/glfw )
 
 # HelloTriangle binary
 set_property( DIRECTORY PROPERTY VS_STARTUP_PROJECT HelloTriangle )
 file(GLOB SOURCE_HEADERS "src/*.h")
 add_executable( HelloTriangle WIN32 src/HelloTriangle.cpp ${SOURCE_HEADERS} )
 add_dependencies( HelloTriangle HelloTriangle_shaders )
+
+if( NOT TODO )
+	add_definitions( -DNO_TODO )
+endif()
 
 if( MSVC )
 	target_compile_definitions( HelloTriangle PRIVATE $<$<CONFIG:Debug>:_CONSOLE> )
@@ -99,7 +114,19 @@ find_library(
 	NO_DEFAULT_PATH
 )
 message( "Vulkan libs: " ${VULKAN_LIBRARY} )
-if( UNIX AND NOT CYGWIN AND NOT MINGW )
-	set( ADDITIONAL_LIBS xcb xcb-keysyms X11 )
+
+if( ${WSI} STREQUAL "USE_PLATFORM_GLFW" )
+	set( WSI_LIBS glfw )
+elseif( ${WSI} STREQUAL "VK_USE_PLATFORM_WIN32_KHR" )
+	set( WSI_LIBS )
+	add_definitions( -DUNICODE )
+elseif( ${WSI} STREQUAL "VK_USE_PLATFORM_XLIB_KHR" )
+	set( WSI_LIBS X11 )
+elseif( ${WSI} STREQUAL "VK_USE_PLATFORM_XCB_KHR" )
+	set( WSI_LIBS xcb xcb-keysyms )
+elseif( ${WSI} STREQUAL "VK_USE_PLATFORM_WAYLAND_KHR" )
+	set( WSI_LIBS wayland-client xkbcommon )
 endif()
-target_link_libraries( HelloTriangle "${VULKAN_LIBRARY}" glfw ${ADDITIONAL_LIBS} )
+add_definitions( -D${WSI} )
+
+target_link_libraries( HelloTriangle "${VULKAN_LIBRARY}" "${WSI_LIBS}" )

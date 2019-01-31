@@ -50,10 +50,12 @@ Requirements
 
 **OS**: Windows or Linux  
 **Language**: C++14  
-**Build environment**: installed (latest) LunarG SDK  
-**Build environment**: On Windows MS Visual Studio, Cygwin, MinGW (or IDEs running on top of them)  
-**Build environment**: On Linux g++ and libxcb-dev and libxcb-keysyms-dev  
-**Build Environment[Optional]**: GLFW 3.2+ (included as a git submodule)  
+**Build environment**: (latest) LunarG SDK (requires `VULKAN_SDK` variable, and `glslc` binary built)  
+**Build environment[Windows]**: Visual Studio, Cygwin, or MinGW (or IDEs running on top of them)  
+**Build environment[Linux]**: g++ or clang (and compatible IDEs) and libxcb-dev and libxcb-keysyms-dev  
+**Build Environment[GLFW]**: GLFW 3.2+ (already included as a git submodule), requires `xorg-dev` package on Linux  
+**Build environment[Xlib]**: Requires `xorg-dev` package  
+**Build environment[XCB]**: Requires `libxcb1-dev`, `libxcb-util-dev`, `libxcb-keysyms1-dev`, and `x11proto-dev` packages  
 **Target Environment**: installed (latest) Vulkan capable drivers (to see anything)  
 **Target Environment**: GLFW(recommended), XCB or Xlib based windowing system
 
@@ -131,6 +133,13 @@ or even just
 
 Then use `make`, or the generated Visual Studio `*.sln`, or whatever it created.
 
+There are two cmake options (supplied by `-D`):
+ - `WSI` -- set this to `USE_PLATFORM_GLFW` or any `VK_USE_PLATFORM_*_KHR` to
+    select the WSI to be used. Default is GLFW.
+ - `TODO` -- set this to `OFF` to remove TODO messages during compilation.
+
+ You also might want to add `-DCMAKE_BUILD_TYPE=Debug`.
+
 <hr />
 
 The code base is quite simple and it can be built manually. It only assumes that
@@ -161,12 +170,11 @@ by defining `NO_TODO` preprocessor macro.
 Using GLFW is optional. You may choose another windowing platform by modifying
 `VulkanEnvironment.h`. By default all platforms use GLFW.
 
-TODO cmake should link glfw, xcb, or xlib based on the platform used
-
 Run
 ------------------------
 
 You just run it as you would anything else.
 
 <kbd>Esc</kbd> does terminate the app.  
-<kbd>Alt</kbd> + <kbd>Enter</kbd> toggles fullscreen if using GLFW.
+<kbd>Alt</kbd> + <kbd>Enter</kbd> toggles fullscreen (might not work on some WSI
+platforms.
