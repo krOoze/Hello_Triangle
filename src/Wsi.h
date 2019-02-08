@@ -29,8 +29,8 @@
 
 #ifndef VK_USE_PLATFORM_WAYLAND_KHR
 // dummy impl for platforms that do not need these functions
-uint32_t getWindowWidth( PlatformWindow window ){ return 0; }
-uint32_t getWindowHeight( PlatformWindow window ){ return 0; }
+uint32_t getWindowWidth( PlatformWindow ){ return 0; }
+uint32_t getWindowHeight( PlatformWindow ){ return 0; }
 #endif
 
 #endif //HELLO_TRIANGLE_WSI_PLATFORM_H
