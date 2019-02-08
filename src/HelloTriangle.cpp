@@ -1135,10 +1135,13 @@ VkPresentModeKHR getSurfacePresentMode( VkPhysicalDevice physicalDevice, VkSurfa
 }
 
 VkSwapchainKHR initSwapchain( VkPhysicalDevice physicalDevice, VkDevice device, VkSurfaceKHR surface, VkSurfaceFormatKHR surfaceFormat, VkSurfaceCapabilitiesKHR capabilities, VkSwapchainKHR oldSwapchain ){
-	TODO( "Perhaps not really necessary to have VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR" )
-	if(  !( capabilities.supportedCompositeAlpha & VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR )  ){
-		throw "VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR not supported!";
-	}
+	// we don't care as we are always setting alpha to 1.0
+	VkCompositeAlphaFlagBitsKHR compositeAlphaFlag;
+	if( capabilities.supportedCompositeAlpha & VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR ) compositeAlphaFlag = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
+	else if( capabilities.supportedCompositeAlpha & VK_COMPOSITE_ALPHA_PRE_MULTIPLIED_BIT_KHR ) compositeAlphaFlag = VK_COMPOSITE_ALPHA_PRE_MULTIPLIED_BIT_KHR;
+	else if( capabilities.supportedCompositeAlpha & VK_COMPOSITE_ALPHA_POST_MULTIPLIED_BIT_KHR ) compositeAlphaFlag = VK_COMPOSITE_ALPHA_POST_MULTIPLIED_BIT_KHR;
+	else if( capabilities.supportedCompositeAlpha & VK_COMPOSITE_ALPHA_INHERIT_BIT_KHR ) compositeAlphaFlag = VK_COMPOSITE_ALPHA_INHERIT_BIT_KHR;
+	else throw "Unknown composite alpha reported.";
 
 	// for all modes having at least two Images can be beneficial
 	TODO( "Or is it minImageCount + 1 ? Gotta think this through." )
@@ -1161,7 +1164,7 @@ VkSwapchainKHR initSwapchain( VkPhysicalDevice physicalDevice, VkDevice device, 
 		0, // sharing queue families count
 		nullptr, // sharing queue families
 		capabilities.currentTransform,
-		VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
+		compositeAlphaFlag,
 		getSurfacePresentMode( physicalDevice, surface ),
 		VK_TRUE, // clipped
 		oldSwapchain
