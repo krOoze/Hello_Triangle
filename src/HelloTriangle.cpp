@@ -213,7 +213,7 @@ void recordEndRenderPass( VkCommandBuffer commandBuffer );
 void recordBindPipeline( VkCommandBuffer commandBuffer, VkPipeline pipeline );
 void recordBindVertexBuffer( VkCommandBuffer commandBuffer, const uint32_t vertexBufferBinding, VkBuffer vertexBuffer );
 
-void recordDraw( VkCommandBuffer commandBuffer, const vector<Vertex2D_ColorF_pack> vertices );
+void recordDraw( VkCommandBuffer commandBuffer, uint32_t vertexCount );
 
 void submitToQueue( VkQueue queue, VkCommandBuffer commandBuffer, VkSemaphore imageReadyS, VkSemaphore renderDoneS, VkFence fence = VK_NULL_HANDLE );
 void present( VkQueue queue, VkSwapchainKHR swapchain, uint32_t swapchainImageIndex, VkSemaphore renderDoneS );
@@ -444,7 +444,7 @@ int helloTriangle() try{
 					recordBindPipeline( commandBuffers[i], pipeline );
 					recordBindVertexBuffer( commandBuffers[i], vertexBufferBinding, vertexBuffer );
 
-					recordDraw( commandBuffers[i], triangle );
+					recordDraw(  commandBuffers[i], static_cast<uint32_t>( triangle.size() )  );
 
 					recordEndRenderPass( commandBuffers[i] );
 				endCommandBuffer( commandBuffers[i] );
@@ -1781,8 +1781,8 @@ void recordBindVertexBuffer( VkCommandBuffer commandBuffer, const uint32_t verte
 	vkCmdBindVertexBuffers( commandBuffer, vertexBufferBinding, 1 /*binding count*/, &vertexBuffer, offsets );
 }
 
-void recordDraw( VkCommandBuffer commandBuffer, const vector<Vertex2D_ColorF_pack> vertices ){
-	vkCmdDraw( commandBuffer, static_cast<uint32_t>( vertices.size() ), 1 /*instance count*/, 0 /*first vertex*/, 0 /*first instance*/ );
+void recordDraw( VkCommandBuffer commandBuffer, const uint32_t vertexCount ){
+	vkCmdDraw( commandBuffer, vertexCount, 1 /*instance count*/, 0 /*first vertex*/, 0 /*first instance*/ );
 }
 
 void submitToQueue( VkQueue queue, VkCommandBuffer commandBuffer, VkSemaphore imageReadyS, VkSemaphore renderDoneS, VkFence fence ){
