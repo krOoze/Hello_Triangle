@@ -1109,8 +1109,6 @@ VkPresentModeKHR getSurfacePresentMode( VkPhysicalDevice physicalDevice, VkSurfa
 		}
 	}
 
-
-
 	for( auto m : modes ){
 		if( m == VK_PRESENT_MODE_FIFO_KHR ){
 			if( selectedMode != 1 ){
@@ -1143,10 +1141,9 @@ VkSwapchainKHR initSwapchain( VkPhysicalDevice physicalDevice, VkDevice device, 
 	else if( capabilities.supportedCompositeAlpha & VK_COMPOSITE_ALPHA_INHERIT_BIT_KHR ) compositeAlphaFlag = VK_COMPOSITE_ALPHA_INHERIT_BIT_KHR;
 	else throw "Unknown composite alpha reported.";
 
-	// for all modes having at least two Images can be beneficial
-	TODO( "Or is it minImageCount + 1 ? Gotta think this through." )
-	uint32_t minImageCount = std::max<uint32_t>( 2, capabilities.minImageCount );
-	if( capabilities.maxImageCount ) minImageCount = std::min<uint32_t>( minImageCount, capabilities.maxImageCount );
+	// minImageCount + 1 seems a sensible default. It means 2 images should always be readily available without blocking. May lead to memory waste though if we care about that.
+	uint32_t myMinImageCount = capabilities.minImageCount + 1;
+	if( capabilities.maxImageCount ) myMinImageCount = std::min<uint32_t>( myMinImageCount, capabilities.maxImageCount );
 
 
 	VkSwapchainCreateInfoKHR swapchainInfo{
@@ -1154,7 +1151,7 @@ VkSwapchainKHR initSwapchain( VkPhysicalDevice physicalDevice, VkDevice device, 
 		nullptr, // pNext for extensions use
 		0, // flags - reserved for future use
 		surface,
-		minImageCount, // minImageCount
+		myMinImageCount, // minImageCount
 		surfaceFormat.format,
 		surfaceFormat.colorSpace,
 		capabilities.currentExtent,
