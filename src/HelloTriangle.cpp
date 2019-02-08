@@ -233,7 +233,7 @@ int helloTriangle() try{
 		{ /*lb*/ { {-0.5f * triangleSize,  sqrtf( 3.0f ) * 0.25f * triangleSize} }, /*B*/{ {0.0f, 0.0f, 1.0f} }  }
 	};
 
-	const auto supportedLayers = enumerate<VkLayerProperties>();
+	const auto supportedLayers = enumerate<VkInstance, VkLayerProperties>();
 	vector<const char*> requestedLayers;
 
 #if VULKAN_VALIDATION
@@ -607,14 +607,14 @@ vector<const char*> checkInstanceLayerSupport( const vector<const char*>& reques
 }
 
 vector<const char*> checkInstanceLayerSupport( const vector<const char*>& optionalLayers ){
-	return checkInstanceLayerSupport( optionalLayers, enumerate<VkLayerProperties>() );
+	return checkInstanceLayerSupport( optionalLayers, enumerate<VkInstance, VkLayerProperties>() );
 }
 
 vector<VkExtensionProperties> getSupportedInstanceExtensions( const vector<const char*>& providingLayers ){
-	auto supportedExtensions = enumerate<VkExtensionProperties>();
+	auto supportedExtensions = enumerate<VkInstance, VkExtensionProperties>();
 
 	for( const auto pl : providingLayers ){
-		const auto providedExtensions = enumerate<VkExtensionProperties>( pl );
+		const auto providedExtensions = enumerate<VkInstance, VkExtensionProperties>( pl );
 		supportedExtensions.insert( supportedExtensions.end(), providedExtensions.begin(), providedExtensions.end() );
 	}
 
