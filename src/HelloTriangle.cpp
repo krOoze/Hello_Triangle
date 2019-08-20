@@ -237,8 +237,8 @@ int helloTriangle() try{
 	vector<const char*> requestedLayers;
 
 #if VULKAN_VALIDATION
-	if(  isLayerSupported( "VK_LAYER_LUNARG_standard_validation", supportedLayers )  ) requestedLayers.push_back( "VK_LAYER_LUNARG_standard_validation" );
-	else throw "VULKAN_VALIDATION is enabled but VK_LAYER_LUNARG_standard_validation layers are not supported!";
+	if(  isLayerSupported( "VK_LAYER_KHRONOS_validation", supportedLayers )  ) requestedLayers.push_back( "VK_LAYER_KHRONOS_validation" );
+	else throw "VULKAN_VALIDATION is enabled but VK_LAYER_KHRONOS_validation layers are not supported!";
 
 	if( ::useAssistantLayer ){
 		if(  isLayerSupported( "VK_LAYER_LUNARG_assistant_layer", supportedLayers )  ) requestedLayers.push_back( "VK_LAYER_LUNARG_assistant_layer" );
