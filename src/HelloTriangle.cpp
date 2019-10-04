@@ -45,7 +45,7 @@ using std::vector;
 // Config
 //////////////////////////////////////////////////////////////////////////////////
 
-const char appName[] = u8"Hello Vulkan Triangle";
+const char appName[] = u8"Hello Vulkan Triangle -- Vertex Offset";
 
 // layers and debug
 #if VULKAN_VALIDATION
@@ -225,7 +225,7 @@ void recordBeginRenderPass(
 void recordEndRenderPass( VkCommandBuffer commandBuffer );
 
 void recordBindPipeline( VkCommandBuffer commandBuffer, VkPipeline pipeline );
-void recordBindVertexBuffer( VkCommandBuffer commandBuffer, const uint32_t vertexBufferBinding, VkBuffer vertexBuffer );
+void recordBindVertexBuffer( VkCommandBuffer commandBuffer, const uint32_t vertexBufferBinding, VkBuffer vertexBuffer, VkDeviceSize offset );
 
 void recordDraw( VkCommandBuffer commandBuffer, uint32_t vertexCount );
 
@@ -244,6 +244,7 @@ int helloTriangle() try{
 
 	const float triangleSize = 1.6f;
 	const vector<Vertex2D_ColorF_pack> triangle = {
+		{ /*unused*/{ {             0.0f,                                  0.0f} },      { {0.0f, 0.0f, 0.0f} }  },
 		{ /*rb*/ { { 0.5f * triangleSize,  sqrtf( 3.0f ) * 0.25f * triangleSize} }, /*R*/{ {1.0f, 0.0f, 0.0f} }  },
 		{ /* t*/ { {                0.0f, -sqrtf( 3.0f ) * 0.25f * triangleSize} }, /*G*/{ {0.0f, 1.0f, 0.0f} }  },
 		{ /*lb*/ { {-0.5f * triangleSize,  sqrtf( 3.0f ) * 0.25f * triangleSize} }, /*B*/{ {0.0f, 0.0f, 1.0f} }  }
@@ -464,9 +465,9 @@ int helloTriangle() try{
 					recordBeginRenderPass( commandBuffers[i], renderPass, framebuffers[i], ::clearColor, surfaceSize.width, surfaceSize.height );
 
 					recordBindPipeline( commandBuffers[i], pipeline );
-					recordBindVertexBuffer( commandBuffers[i], vertexBufferBinding, vertexBuffer );
+					recordBindVertexBuffer(  commandBuffers[i], vertexBufferBinding, vertexBuffer, 1 * sizeof( Vertex2D_ColorF_pack )  );
 
-					recordDraw(  commandBuffers[i], static_cast<uint32_t>( triangle.size() )  );
+					recordDraw(  commandBuffers[i], static_cast<uint32_t>( triangle.size() - 1 )  );
 
 					recordEndRenderPass( commandBuffers[i] );
 				endCommandBuffer( commandBuffers[i] );
@@ -1864,9 +1865,8 @@ void recordBindPipeline( VkCommandBuffer commandBuffer, VkPipeline pipeline ){
 	vkCmdBindPipeline( commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline );
 }
 
-void recordBindVertexBuffer( VkCommandBuffer commandBuffer, const uint32_t vertexBufferBinding, VkBuffer vertexBuffer ){
-	VkDeviceSize offsets[] = {0};
-	vkCmdBindVertexBuffers( commandBuffer, vertexBufferBinding, 1 /*binding count*/, &vertexBuffer, offsets );
+void recordBindVertexBuffer( VkCommandBuffer commandBuffer, const uint32_t vertexBufferBinding, VkBuffer vertexBuffer, VkDeviceSize offset ){
+	vkCmdBindVertexBuffers( commandBuffer, vertexBufferBinding, 1 /*binding count*/, &vertexBuffer, &offset );
 }
 
 void recordDraw( VkCommandBuffer commandBuffer, const uint32_t vertexCount ){
