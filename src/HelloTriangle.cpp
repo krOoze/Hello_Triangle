@@ -10,17 +10,19 @@
 // Includes
 //////////////////////////////////////////////////////////////////////////////////
 
+#include <algorithm>
 #include <cassert>
 #include <cmath>
 #include <cstdlib>
 #include <cstring>
-#include <algorithm>
 #include <exception>
 #include <fstream>
 #include <functional>
 #include <iterator>
 #include <stdexcept>
 #include <string>
+#include <tuple>
+#include <utility>
 #include <vector>
 
 #include <vulkan/vulkan.h> // also assume core+WSI commands are loaded
@@ -72,6 +74,7 @@ constexpr uint32_t initialWindowHeight = 800;
 
 //constexpr VkPresentModeKHR presentMode = VK_PRESENT_MODE_IMMEDIATE_KHR; // better not be used often because of coil whine
 constexpr VkPresentModeKHR presentMode = VK_PRESENT_MODE_FIFO_KHR;
+//constexpr VkPresentModeKHR presentMode = VK_PRESENT_MODE_MAILBOX_KHR;
 
 // pipeline settings
 constexpr VkClearValue clearColor = {  { {0.1f, 0.1f, 0.1f, 1.0f} }  };
@@ -94,13 +97,14 @@ VkPhysicalDevice getPhysicalDevice( VkInstance instance, VkSurfaceKHR surface = 
 VkPhysicalDeviceProperties getPhysicalDeviceProperties( VkPhysicalDevice physicalDevice );
 VkPhysicalDeviceMemoryProperties getPhysicalDeviceMemoryProperties( VkPhysicalDevice physicalDevice );
 
-uint32_t getQueueFamily( VkPhysicalDevice physDevice, VkSurfaceKHR surface );
+std::pair<uint32_t, uint32_t> getQueueFamilies( VkPhysicalDevice physDevice, VkSurfaceKHR surface );
 vector<VkQueueFamilyProperties> getQueueFamilyProperties( VkPhysicalDevice device );
 
 VkDevice initDevice(
 	VkPhysicalDevice physDevice,
 	const VkPhysicalDeviceFeatures& features,
-	uint32_t queueFamilyIndex,
+	uint32_t graphicsQueueFamily,
+	uint32_t presentQueueFamily,
 	const vector<const char*>& layers = {},
 	const vector<const char*>& extensions = {}
 );
@@ -143,7 +147,16 @@ void killSurface( VkInstance instance, VkSurfaceKHR surface );
 VkSurfaceCapabilitiesKHR getSurfaceCapabilities( VkPhysicalDevice physicalDevice, VkSurfaceKHR surface );
 VkSurfaceFormatKHR getSurfaceFormat( VkPhysicalDevice physicalDevice, VkSurfaceKHR surface );
 
-VkSwapchainKHR initSwapchain( VkPhysicalDevice physicalDevice, VkDevice device, VkSurfaceKHR surface, VkSurfaceFormatKHR surfaceFormat, VkSurfaceCapabilitiesKHR capabilities, VkSwapchainKHR oldSwapchain = VK_NULL_HANDLE );
+VkSwapchainKHR initSwapchain(
+	VkPhysicalDevice physicalDevice,
+	VkDevice device,
+	VkSurfaceKHR surface,
+	VkSurfaceFormatKHR surfaceFormat,
+	VkSurfaceCapabilitiesKHR capabilities,
+	uint32_t graphicsQueueFamily,
+	uint32_t presentQueueFamily,
+	VkSwapchainKHR oldSwapchain = VK_NULL_HANDLE
+);
 void killSwapchain( VkDevice device, VkSwapchainKHR swapchain );
 
 uint32_t getNextImageIndex( VkDevice device, VkSwapchainKHR swapchain, VkSemaphore imageReadyS );
@@ -313,13 +326,15 @@ int helloTriangle() try{
 	const VkPhysicalDeviceProperties physicalDeviceProperties = getPhysicalDeviceProperties( physicalDevice );
 	const VkPhysicalDeviceMemoryProperties physicalDeviceMemoryProperties = getPhysicalDeviceMemoryProperties( physicalDevice );
 
-	const uint32_t queueFamily = getQueueFamily( physicalDevice, surface );
+	uint32_t graphicsQueueFamily, presentQueueFamily;
+	std::tie( graphicsQueueFamily, presentQueueFamily ) = getQueueFamilies( physicalDevice, surface );
 
 	const VkPhysicalDeviceFeatures features = {}; // don't need any special feature for this demo
 	const vector<const char*> deviceExtensions = { VK_KHR_SWAPCHAIN_EXTENSION_NAME };
 
-	VkDevice device = initDevice( physicalDevice, features, queueFamily, requestedLayers, deviceExtensions );
-	VkQueue queue = getQueue( device, queueFamily, 0 );
+	const VkDevice device = initDevice( physicalDevice, features, graphicsQueueFamily, presentQueueFamily, requestedLayers, deviceExtensions );
+	const VkQueue graphicsQueue = getQueue( device, graphicsQueueFamily, 0 );
+	const VkQueue presentQueue = getQueue( device, presentQueueFamily, 0 );
 
 
 	VkSurfaceFormatKHR surfaceFormat = getSurfaceFormat( physicalDevice, surface );
@@ -345,7 +360,7 @@ int helloTriangle() try{
 	);
 	setVertexData( device, vertexBufferMemory, triangle ); // Writes throug memory map. Synchronization is implicit for any subsequent vkQueueSubmit batches.
 
-	VkCommandPool commandPool = initCommandPool( device, queueFamily );
+	VkCommandPool commandPool = initCommandPool( device, graphicsQueueFamily );
 
 	// might need synchronization if init is more advanced than this
 	//VkResult errorCode = vkDeviceWaitIdle( device ); RESULT_HANDLER( errorCode, "vkDeviceWaitIdle" );
@@ -419,7 +434,8 @@ int helloTriangle() try{
 
 		// creating new
 		if( swapchainCreatable ){
-			swapchain = initSwapchain( physicalDevice, device, surface, surfaceFormat, capabilities, swapchain ); // reuses & destroys oldSwapchain
+			// reuses & destroys the oldSwapchain
+			swapchain = initSwapchain( physicalDevice, device, surface, surfaceFormat, capabilities, graphicsQueueFamily, presentQueueFamily, swapchain );
 
 			vector<VkImage> swapchainImages = enumerate<VkImage>( device, swapchain );
 			swapchainImageViews = initSwapchainImageViews( device, swapchainImages, surfaceFormat.format );
@@ -471,8 +487,8 @@ int helloTriangle() try{
 			{VkResult errorCode = vkResetFences( device, 1, &submissionFences[submissionNr] ); RESULT_HANDLER( errorCode, "vkResetFences" );}
 
 			uint32_t nextSwapchainImageIndex = getNextImageIndex( device, swapchain, imageReadySs[submissionNr] );
-			submitToQueue( queue, commandBuffers[nextSwapchainImageIndex], imageReadySs[submissionNr], renderDoneSs[submissionNr], submissionFences[submissionNr] );
-			present( queue, swapchain, nextSwapchainImageIndex, renderDoneSs[submissionNr] );
+			submitToQueue( graphicsQueue, commandBuffers[nextSwapchainImageIndex], imageReadySs[submissionNr], renderDoneSs[submissionNr], submissionFences[submissionNr] );
+			present( presentQueue, swapchain, nextSwapchainImageIndex, renderDoneSs[submissionNr] );
 
 			submissionNr = (submissionNr + 1) % maxInflightSubmissions;
 		}
@@ -799,24 +815,43 @@ vector<VkQueueFamilyProperties> getQueueFamilyProperties( VkPhysicalDevice devic
 	return queueFamilies;
 }
 
-uint32_t getQueueFamily( const VkPhysicalDevice physDevice, const VkSurfaceKHR surface ){
+std::pair<uint32_t, uint32_t> getQueueFamilies( const VkPhysicalDevice physDevice, const VkSurfaceKHR surface ){
+	using std::make_pair;
 	const auto qfps = getQueueFamilyProperties( physDevice );
 
-	TODO( "Should contain the possibility of separate graphics and present queue!" )
-
-	for( uint32_t qfi = 0; qfi < qfps.size(); ++qfi ){
-		if(  (qfps[qfi].queueFlags & VK_QUEUE_GRAPHICS_BIT) && qfps[qfi].queueCount && isPresentationSupported( physDevice, qfi, surface )  ){
-			return qfi;
+	// find fused graphics and present family
+	for( uint32_t queueFamily = 0; queueFamily < qfps.size(); ++queueFamily){
+		if(  (qfps[queueFamily].queueFlags & VK_QUEUE_GRAPHICS_BIT) && isPresentationSupported( physDevice, queueFamily, surface )  ){
+			return make_pair( queueFamily, queueFamily );
 		}
 	}
 
-	throw "Cannot find a queue family supporting both graphics + present operations!";
+	uint32_t graphicsQueueFamily = VK_QUEUE_FAMILY_IGNORED;
+	uint32_t presentQueueFamily = VK_QUEUE_FAMILY_IGNORED;
+
+	for( uint32_t queueFamily = 0; queueFamily < qfps.size(); ++queueFamily ){
+		if( qfps[queueFamily].queueFlags & VK_QUEUE_GRAPHICS_BIT ){
+			graphicsQueueFamily = queueFamily;
+		}
+	}
+
+	for( uint32_t queueFamily = 0; queueFamily < qfps.size(); ++queueFamily ){
+		if(  isPresentationSupported( physDevice, queueFamily, surface )  ){
+			presentQueueFamily = queueFamily;
+		}
+	}
+
+	if( graphicsQueueFamily == VK_QUEUE_FAMILY_IGNORED ) throw "Cannot find a graphics queue family!";
+	if( presentQueueFamily == VK_QUEUE_FAMILY_IGNORED ) throw "Cannot find a presentation queue family!";
+
+	return make_pair( graphicsQueueFamily, presentQueueFamily );
 }
 
 VkDevice initDevice(
 	const VkPhysicalDevice physDevice,
 	const VkPhysicalDeviceFeatures& features,
-	const uint32_t queueFamilyIndex,
+	const uint32_t graphicsQueueFamily,
+	const uint32_t presentQueueFamily,
 	const vector<const char*>& layers,
 	const vector<const char*>& extensions
 ){
@@ -824,16 +859,27 @@ VkDevice initDevice(
 
 	const float priority[] = {1.0f};
 
-	const vector<VkDeviceQueueCreateInfo> queues = {
+	vector<VkDeviceQueueCreateInfo> queues = {
 		{
 			VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
 			nullptr, // pNext
 			0, // flags
-			queueFamilyIndex,
+			graphicsQueueFamily,
 			1, // queue count
 			priority
 		}
 	};
+
+	if( presentQueueFamily != graphicsQueueFamily ){
+		queues.push_back({
+			VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
+			nullptr, // pNext
+			0, // flags
+			presentQueueFamily,
+			1, // queue count
+			priority
+		});
+	}
 
 	const VkDeviceCreateInfo deviceInfo{
 		VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
@@ -1131,7 +1177,16 @@ VkPresentModeKHR getSurfacePresentMode( VkPhysicalDevice physicalDevice, VkSurfa
 	}
 }
 
-VkSwapchainKHR initSwapchain( VkPhysicalDevice physicalDevice, VkDevice device, VkSurfaceKHR surface, VkSurfaceFormatKHR surfaceFormat, VkSurfaceCapabilitiesKHR capabilities, VkSwapchainKHR oldSwapchain ){
+VkSwapchainKHR initSwapchain(
+	VkPhysicalDevice physicalDevice,
+	VkDevice device,
+	VkSurfaceKHR surface,
+	VkSurfaceFormatKHR surfaceFormat,
+	VkSurfaceCapabilitiesKHR capabilities,
+	uint32_t graphicsQueueFamily,
+	uint32_t presentQueueFamily,
+	VkSwapchainKHR oldSwapchain
+){
 	// we don't care as we are always setting alpha to 1.0
 	VkCompositeAlphaFlagBitsKHR compositeAlphaFlag;
 	if( capabilities.supportedCompositeAlpha & VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR ) compositeAlphaFlag = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
@@ -1144,7 +1199,7 @@ VkSwapchainKHR initSwapchain( VkPhysicalDevice physicalDevice, VkDevice device, 
 	uint32_t myMinImageCount = capabilities.minImageCount + 1;
 	if( capabilities.maxImageCount ) myMinImageCount = std::min<uint32_t>( myMinImageCount, capabilities.maxImageCount );
 
-
+	const std::vector<uint32_t> queueFamilies = { graphicsQueueFamily, presentQueueFamily };
 	VkSwapchainCreateInfoKHR swapchainInfo{
 		VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
 		nullptr, // pNext for extensions use
@@ -1156,9 +1211,10 @@ VkSwapchainKHR initSwapchain( VkPhysicalDevice physicalDevice, VkDevice device, 
 		capabilities.currentExtent,
 		1,
 		VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, // VkImage usage flags
-		VK_SHARING_MODE_EXCLUSIVE,
-		0, // sharing queue families count
-		nullptr, // sharing queue families
+		// It should be fine to just use CONCURRENT in the off chance we encounter the elusive GPU with separate present queue
+		graphicsQueueFamily == presentQueueFamily ? VK_SHARING_MODE_EXCLUSIVE : VK_SHARING_MODE_CONCURRENT,
+		static_cast<uint32_t>( queueFamilies.size() ),
+		queueFamilies.data(),
 		capabilities.currentTransform,
 		compositeAlphaFlag,
 		getSurfacePresentMode( physicalDevice, surface ),
