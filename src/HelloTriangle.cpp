@@ -359,11 +359,11 @@ int helloTriangle() try{
 	VkPipeline pipeline = VK_NULL_HANDLE; // has to be NULL for the case the app ends before even first swapchain
 	vector<VkCommandBuffer> commandBuffers;
 
-	vector<VkSemaphore> imageReadySs; // has to be NULL for the case the app ends before even first swapchain
-	VkSemaphore renderDoneS = VK_NULL_HANDLE; // has to be NULL for the case the app ends before even first swapchain
+	vector<VkSemaphore> imageReadySs;
+	vector<VkSemaphore> renderDoneSs;
 
-	// workaround for validation layer "leak" + might also help driver to cleanup old resources
-	// this should not be needed for real-word app, because they are likely to use fences naturaly (e.g. user input reaction)
+	// workaround for validation layer "memory leak" + might also help the driver to cleanup old resources
+	// this should not be needed for a real-word app, because they are likely to use fences naturaly (e.g. responding to user input )
 	// read https://github.com/KhronosGroup/Vulkan-LoaderAndValidationLayers/issues/1628
 	const uint32_t maxInflightSubmissions = 2; // more than 2 probably does not make much sense
 	uint32_t submissionNr = 0; // index of the current submission modulo maxInflightSubmission
@@ -399,7 +399,7 @@ int helloTriangle() try{
 			killFences( device, submissionFences );
 
 			// semaphores might be in signaled state, so kill them too to get fresh unsignaled
-			killSemaphore( device, renderDoneS );
+			killSemaphores( device, renderDoneSs );
 			killSemaphores( device, imageReadySs );
 
 			// only reset + later reuse already allocated and create new only if needed
@@ -451,7 +451,7 @@ int helloTriangle() try{
 			}
 
 			imageReadySs = initSemaphores( device, maxInflightSubmissions );
-			renderDoneS = initSemaphore( device );
+			renderDoneSs = initSemaphores( device, maxInflightSubmissions );
 
 			submissionFences = initFences( device, maxInflightSubmissions, VK_FENCE_CREATE_SIGNALED_BIT ); // signaled fence means previous execution finished, so we start rendering presignaled
 			submissionNr = 0;
@@ -471,11 +471,10 @@ int helloTriangle() try{
 			{VkResult errorCode = vkResetFences( device, 1, &submissionFences[submissionNr] ); RESULT_HANDLER( errorCode, "vkResetFences" );}
 
 			uint32_t nextSwapchainImageIndex = getNextImageIndex( device, swapchain, imageReadySs[submissionNr] );
+			submitToQueue( queue, commandBuffers[nextSwapchainImageIndex], imageReadySs[submissionNr], renderDoneSs[submissionNr], submissionFences[submissionNr] );
+			present( queue, swapchain, nextSwapchainImageIndex, renderDoneSs[submissionNr] );
 
-			submitToQueue( queue, commandBuffers[nextSwapchainImageIndex], imageReadySs[submissionNr], renderDoneS, submissionFences[submissionNr] );
 			submissionNr = (submissionNr + 1) % maxInflightSubmissions;
-
-			present( queue, swapchain, nextSwapchainImageIndex, renderDoneS );
 		}
 		catch( VulkanResultException ex ){
 			if( ex.result == VK_SUBOPTIMAL_KHR || ex.result == VK_ERROR_OUT_OF_DATE_KHR ){
@@ -503,7 +502,7 @@ int helloTriangle() try{
 
 
 	// kill swapchain
-	killSemaphore( device, renderDoneS );
+	killSemaphores( device, renderDoneSs );
 	killSemaphores( device, imageReadySs );
 
 	// command buffers killed with pool
