@@ -6,8 +6,9 @@
 #ifndef COMMON_ENUMERATE_SCHEME_H
 #define COMMON_ENUMERATE_SCHEME_H
 
-#include <vector>
 #include <functional>
+#include <type_traits>
+#include <vector>
 
 #include <vulkan/vulkan.h>
 
@@ -44,10 +45,11 @@ std::vector<Element> enumerateScheme( Cmd cmd, const char* cmdName ){
 // Adapters for specific Vulkan commands
 ///////////////////////////////////////////////
 
-template< typename Element, typename... Ts >
+template< typename Element, typename... Ts, typename = std::enable_if_t<!std::is_same<Element, VkInstance>::value>  >
 std::vector<Element> enumerate( Ts... );
 
-template< typename Tag, typename Element, typename... Ts >
+// Tag will be VkInstance if to disambiguate commands that also work on device
+template< typename Tag, typename Element, typename... Ts, typename = std::enable_if_t<std::is_same<Tag, VkInstance>::value> >
 std::vector<Element> enumerate( Ts... );
 
 // for vkEnumerateInstanceLayerProperties -- auto v = enumerate<VkInstance, VkLayerProperties>();
