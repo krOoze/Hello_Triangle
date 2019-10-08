@@ -6,6 +6,7 @@
 #include <functional>
 #include <string>
 #include <vector>
+#include <cassert>
 
 #include <Windows.h>
 #include <vulkan/vulkan.h>
@@ -16,6 +17,9 @@
 
 TODO( "Easier to use, but might prevent platform co-existence. Could be namespaced. Make all of this a class?" )
 struct PlatformWindow{ HINSTANCE hInstance; HWND hWnd; };
+
+const DWORD windowedStyle = WS_OVERLAPPEDWINDOW | WS_CLIPCHILDREN | WS_CLIPSIBLINGS;
+const DWORD windowedExStyle = WS_EX_OVERLAPPEDWINDOW | WS_EX_NOREDIRECTIONBITMAP;
 
 std::string getPlatformSurfaceExtensionName(){ return VK_KHR_WIN32_SURFACE_EXTENSION_NAME; };
 
@@ -75,9 +79,6 @@ int messageLoop( PlatformWindow window ){
 
 	return static_cast<int>( msg.wParam );
 }
-
-	DWORD windowedStyle = WS_OVERLAPPEDWINDOW | WS_CLIPCHILDREN | WS_CLIPSIBLINGS;
-	DWORD windowedExStyle = WS_EX_OVERLAPPEDWINDOW;
 
 void toggleFullscreen( HWND hWnd ){
 	TODO( "All of this needs to be made a class... death to the static!" )
