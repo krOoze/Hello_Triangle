@@ -1,7 +1,7 @@
-// Reflection for Vulkan enums -- mostly to_string
+// Introspection for Vulkan enums -- mostly to_string
 
-#ifndef COMMON_VULKAN_REFLECTION_H
-#define COMMON_VULKAN_REFLECTION_H
+#ifndef COMMON_VULKAN_INTROSPECTION_H
+#define COMMON_VULKAN_INTROSPECTION_H
 
 #include <string>
 #include <sstream>
@@ -260,4 +260,4 @@ std::string to_string_hex( const uint64_t n ){
 	return "0x" + ss.str();
 }
 
-#endif //COMMON_VULKAN_REFLECTION_H
+#endif //COMMON_VULKAN_INTROSPECTION_H
