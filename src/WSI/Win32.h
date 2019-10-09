@@ -18,8 +18,8 @@
 TODO( "Easier to use, but might prevent platform co-existence. Could be namespaced. Make all of this a class?" )
 struct PlatformWindow{ HINSTANCE hInstance; HWND hWnd; };
 
-const DWORD windowedStyle = WS_OVERLAPPEDWINDOW | WS_CLIPCHILDREN | WS_CLIPSIBLINGS;
-const DWORD windowedExStyle = WS_EX_OVERLAPPEDWINDOW | WS_EX_NOREDIRECTIONBITMAP;
+DWORD windowedStyle = WS_OVERLAPPEDWINDOW | WS_CLIPCHILDREN | WS_CLIPSIBLINGS;
+DWORD windowedExStyle = WS_EX_OVERLAPPEDWINDOW;
 
 std::string getPlatformSurfaceExtensionName(){ return VK_KHR_WIN32_SURFACE_EXTENSION_NAME; };
 

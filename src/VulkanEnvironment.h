@@ -24,7 +24,8 @@
 	#endif
 #endif
 
-#if  defined(USE_PLATFORM_GLFW) \
+#if  defined(USE_PLATFORM_NONE) \
+  || defined(USE_PLATFORM_GLFW) \
   || defined(VK_USE_PLATFORM_ANDROID_KHR) \
   || defined(VK_USE_PLATFORM_MIR_KHR) \
   || defined(VK_USE_PLATFORM_WAYLAND_KHR) \
