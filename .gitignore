@@ -8,6 +8,7 @@
 /*.sln
 /*.vcxproj
 /*.vcxproj.filters
+/*.vcxproj.user
 /HelloTriangle.dir/
 /Debug/
 /Release/
