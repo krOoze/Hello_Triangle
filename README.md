@@ -1,8 +1,10 @@
-Hello Triangle Vulkan demo
+Hello Triangle Vulkan DXGI interop demo
 =========================
 
-This is a traditional Hello World style application for the Vulkan API. It
-renders a RGB shaded equilateral triangle (well, if the resolution is a square).
+This is a Hello World style application for the Vulkan API showing qck and
+dyrty interop with DXGI. This demo uses DXGI swapchain and imports its Images
+into Vulkan. Then it renders a RGB shaded equilateral triangle (well, if the
+resolution is a square).
 
 The code is relatively flat and basic, so I think it's good enough for learning.
 No tutorial or even much comments are provided though (comments do lie anyway
@@ -44,21 +46,8 @@ Requirements
 **Language**: C++14  
 **Build environment**: (latest) [Vulkan SDK](https://vulkan.lunarg.com/sdk/home) (requires `VULKAN_SDK` variable being set)  
 **Build environment[Windows]**: Visual Studio, Cygwin, or MinGW (or IDEs running on top of them)  
-**Build environment[Linux]**: CMake compatible compiler and build system and `libxcb-dev` and `libxcb-keysyms-dev`  
-**Build environment[MacOS]**: CMake compatible compiler and build system  
-**Build Environment[GLFW]**: GLFW 3.2+ (already included as a git submodule), requires `xorg-dev` (or XCB) package on Linux  
-**Build environment[Xlib]**: Requires `xorg-dev` package  
-**Build environment[XCB]**: Requires `libxcb1-dev`, `libxcb-util-dev`, `libxcb-keysyms1-dev`, and `x11proto-dev` packages  
-**Build environment[Wayland]**: Requires `libwayland-dev` and `libxkbcommon-dev` packages  
 **Target Environment**: installed (latest) Vulkan capable drivers (to see anything)  
-**Target Environment**: GLFW(recommended), XCB, Xlib, or Wayland based windowing system
-
-On Unix-like environment refer to
-[SDK docs](https://vulkan.lunarg.com/doc/sdk/latest/linux/getting_started.html)
-on how to set `VULKAN_SDK` variable.
-
-Adding `VkSurface` support for other platforms should be straightforward using
-the provided ones as a template for it.
+**Target Environment**: Windows 10 (DirectX 12)
 
 Files
 ----------------------------------
@@ -77,13 +66,7 @@ Files
 | src/Vertex.h | Just simple Vertex definitions |
 | src/VulkanEnvironment.h | Contains header configuration, such platform-specific as `VK_USE_PLATFORM_*` |
 | src/VulkanIntrospection.h | Introspection of Vulkan entities; e.g. convert Vulkan enumerants to strings |
-| src/Wsi.h | Meta-header including one of the platform-specific headers in WSI directory |
-| src/WSI/Glfw.h | WSI platform-dependent stuff via GLFW3 library |
-| src/WSI/Win32.h | Win32 WSI platform-dependent stuff |
-| src/WSI/Xcb.h | XCB WSI platform-dependent stuff |
-| src/WSI/Xlib.h | Xlib WSI platform-dependent stuff |
-| src/WSI/Wayland.h | Wayland WSI platform-dependent stuff |
-| src/WSI/private/ | Stuff the WSI headers need; currently just generated Wayland protocols |
+| src/WSI/DxgiWsi.h | DXGI implementation as a Vulkan swapchain |
 | src/shaders/hello_triangle.vert | The vertex shader program in GLSL |
 | src/shaders/hello_triangle.frag | The fragment shader program in GLSL |
 | .gitignore | Git filter file ignoring most probable outputs messing up the local repo |
@@ -134,8 +117,7 @@ or even just
 Then use `make`, or the generated Visual Studio `*.sln`, or whatever it created.
 
 There are two cmake options (supplied by `-D`):
- - `WSI` -- set this to `USE_PLATFORM_GLFW` or any `VK_USE_PLATFORM_*_KHR` to
-    select the WSI to be used. Default is GLFW.
+ - `WSI` -- ignored. DXGI is used.
  - `TODO` -- set this to `OFF` to remove TODO messages during compilation.
 
 You also might want to add `-DCMAKE_BUILD_TYPE=Debug`.
