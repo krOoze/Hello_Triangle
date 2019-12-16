@@ -4,6 +4,7 @@
 // Global header settings
 //////////////////////////////////////////////////////////////////////////////////
 
+#define VK_USE_PLATFORM_WIN32_KHR
 #include "VulkanEnvironment.h" // first include must be before vulkan.h and platform header
 
 
@@ -32,7 +33,7 @@ static_assert( VK_HEADER_VERSION >= REQUIRED_HEADER_VERSION, "Update your SDK! T
 #include "ErrorHandling.h"
 #include "ExtensionLoader.h"
 #include "Vertex.h"
-#include "Wsi.h"
+#include "WSI/DxgiWsi.h"
 
 
 using std::exception;
@@ -45,7 +46,7 @@ using std::vector;
 // Config
 //////////////////////////////////////////////////////////////////////////////////
 
-const char appName[] = u8"Hello Vulkan Triangle";
+const char appName[] = u8"Hello Vulkan Triangle -- DXGI interop";
 
 // layers and debug
 #if VULKAN_VALIDATION
@@ -66,14 +67,15 @@ const char appName[] = u8"Hello Vulkan Triangle";
 	constexpr bool useAssistantLayer = false;
 #endif
 
-constexpr bool fpsCounter = true;
+constexpr bool fpsCounter = false; TODO( "FPS counter not supported" );
 
 // window and swapchain
 constexpr uint32_t initialWindowWidth = 800;
 constexpr uint32_t initialWindowHeight = 800;
 
+TODO( "Unused variables" );
 //constexpr VkPresentModeKHR presentMode = VK_PRESENT_MODE_IMMEDIATE_KHR; // better not be used often because of coil whine
-constexpr VkPresentModeKHR presentMode = VK_PRESENT_MODE_FIFO_KHR;
+//constexpr VkPresentModeKHR presentMode = VK_PRESENT_MODE_FIFO_KHR;
 //constexpr VkPresentModeKHR presentMode = VK_PRESENT_MODE_MAILBOX_KHR;
 
 // pipeline settings
@@ -95,11 +97,11 @@ bool checkExtensionSupport( const vector<const char*>& extensions, const vector<
 VkInstance initInstance( const vector<const char*>& layers = {}, const vector<const char*>& extensions = {} );
 void killInstance( VkInstance instance );
 
-VkPhysicalDevice getPhysicalDevice( VkInstance instance, VkSurfaceKHR surface = VK_NULL_HANDLE /*seek presentation support if !NULL*/ ); // destroyed with instance
+VkPhysicalDevice getPhysicalDevice( VkInstance instance, PlatformSurface surface = {} /*seek presentation support if !NULL*/ ); // destroyed with instance
 VkPhysicalDeviceProperties getPhysicalDeviceProperties( VkPhysicalDevice physicalDevice );
 VkPhysicalDeviceMemoryProperties getPhysicalDeviceMemoryProperties( VkPhysicalDevice physicalDevice );
 
-std::pair<uint32_t, uint32_t> getQueueFamilies( VkPhysicalDevice physDevice, VkSurfaceKHR surface );
+std::pair<uint32_t, uint32_t> getQueueFamilies( VkPhysicalDevice physDevice, PlatformSurface surface );
 vector<VkQueueFamilyProperties> getQueueFamilyProperties( VkPhysicalDevice device );
 
 VkDevice initDevice(
@@ -141,26 +143,6 @@ void killImage( VkDevice device, VkImage image );
 
 VkImageView initImageView( VkDevice device, VkImage image, VkFormat format );
 void killImageView( VkDevice device, VkImageView imageView );
-
-// initSurface() is platform dependent
-void killSurface( VkInstance instance, VkSurfaceKHR surface );
-
-VkSurfaceCapabilitiesKHR getSurfaceCapabilities( VkPhysicalDevice physicalDevice, VkSurfaceKHR surface );
-VkSurfaceFormatKHR getSurfaceFormat( VkPhysicalDevice physicalDevice, VkSurfaceKHR surface );
-
-VkSwapchainKHR initSwapchain(
-	VkPhysicalDevice physicalDevice,
-	VkDevice device,
-	VkSurfaceKHR surface,
-	VkSurfaceFormatKHR surfaceFormat,
-	VkSurfaceCapabilitiesKHR capabilities,
-	uint32_t graphicsQueueFamily,
-	uint32_t presentQueueFamily,
-	VkSwapchainKHR oldSwapchain = VK_NULL_HANDLE
-);
-void killSwapchain( VkDevice device, VkSwapchainKHR swapchain );
-
-uint32_t getNextImageIndex( VkDevice device, VkSwapchainKHR swapchain, VkSemaphore imageReadyS );
 
 vector<VkImageView> initSwapchainImageViews( VkDevice device, vector<VkImage> images, VkFormat format );
 void killSwapchainImageViews( VkDevice device, vector<VkImageView>& imageViews );
@@ -267,11 +249,8 @@ int helloTriangle() try{
 
 
 	const auto supportedInstanceExtensions = getSupportedInstanceExtensions( requestedLayers );
-	const auto platformSurfaceExtension = getPlatformSurfaceExtensionName();
-	vector<const char*> requestedInstanceExtensions = {
-		VK_KHR_SURFACE_EXTENSION_NAME,
-		platformSurfaceExtension.c_str()
-	};
+	const auto platformSurfaceExtensions = getPlatformSurfaceExtensionNames();
+	vector<const char*> requestedInstanceExtensions = platformSurfaceExtensions;
 
 #if VULKAN_VALIDATION
 	DebugObjectType debugExtensionTag;
@@ -323,7 +302,7 @@ int helloTriangle() try{
 
 
 	const PlatformWindow window = initWindow( ::appName, ::initialWindowWidth, ::initialWindowHeight );
-	const VkSurfaceKHR surface = initSurface( instance, window );
+	const PlatformSurface surface = initSurface( instance, window );
 
 	const VkPhysicalDevice physicalDevice = getPhysicalDevice( instance, surface );
 	const VkPhysicalDeviceProperties physicalDeviceProperties = getPhysicalDeviceProperties( physicalDevice );
@@ -333,7 +312,8 @@ int helloTriangle() try{
 	std::tie( graphicsQueueFamily, presentQueueFamily ) = getQueueFamilies( physicalDevice, surface );
 
 	const VkPhysicalDeviceFeatures features = {}; // don't need any special feature for this demo
-	const vector<const char*> deviceExtensions = { VK_KHR_SWAPCHAIN_EXTENSION_NAME };
+	const auto platformSwapchainExtensions = getPlatformSwapchainExtensionNames();
+	const vector<const char*> deviceExtensions = platformSwapchainExtensions;
 
 	const VkDevice device = initDevice( physicalDevice, features, graphicsQueueFamily, presentQueueFamily, requestedLayers, deviceExtensions );
 	const VkQueue graphicsQueue = getQueue( device, graphicsQueueFamily, 0 );
@@ -373,7 +353,7 @@ int helloTriangle() try{
 
 
 	// place-holder swapchain dependent objects
-	VkSwapchainKHR swapchain = VK_NULL_HANDLE; // has to be NULL -- signifies that there's no swapchain
+	PlatformSwapchain swapchain = VK_NULL_HANDLE; // has to be NULL -- signifies that there's no swapchain
 	vector<VkImageView> swapchainImageViews;
 	vector<VkFramebuffer> framebuffers;
 
@@ -395,15 +375,12 @@ int helloTriangle() try{
 		// swapchain recreation -- will be done before the first frame too;
 		TODO( "This may be triggered from many sources (e.g. WM_SIZE event, and VK_ERROR_OUT_OF_DATE_KHR too). Should prevent duplicate swapchain recreation." )
 
-		const VkSwapchainKHR oldSwapchain = swapchain;
+		const auto oldSwapchain = swapchain;
 		swapchain = VK_NULL_HANDLE;
 
 		VkSurfaceCapabilitiesKHR capabilities = getSurfaceCapabilities( physicalDevice, surface );
 
-		if( capabilities.currentExtent.width == UINT32_MAX && capabilities.currentExtent.height == UINT32_MAX ){
-			capabilities.currentExtent.width = getWindowWidth( window );
-			capabilities.currentExtent.height = getWindowHeight( window );
-		}
+		assert( capabilities.currentExtent.width != UINT32_MAX && capabilities.currentExtent.height != UINT32_MAX );
 		VkExtent2D surfaceSize = { capabilities.currentExtent.width, capabilities.currentExtent.height };
 
 		const bool swapchainCreatable = {
@@ -443,7 +420,7 @@ int helloTriangle() try{
 			// reuses & destroys the oldSwapchain
 			swapchain = initSwapchain( physicalDevice, device, surface, surfaceFormat, capabilities, graphicsQueueFamily, presentQueueFamily, oldSwapchain );
 
-			vector<VkImage> swapchainImages = enumerate<VkImage>( device, swapchain );
+			vector<VkImage> swapchainImages = getSwapchainImages( device, swapchain );
 			swapchainImageViews = initSwapchainImageViews( device, swapchainImages, surfaceFormat.format );
 			framebuffers = initFramebuffers( device, renderPass, swapchainImageViews, surfaceSize.width, surfaceSize.height );
 
@@ -506,7 +483,7 @@ int helloTriangle() try{
 			{VkResult errorCode = vkResetFences( device, 1, &submissionFences[submissionNr] ); RESULT_HANDLER( errorCode, "vkResetFences" );}
 
 			unsafeSemaphore = true;
-			uint32_t nextSwapchainImageIndex = getNextImageIndex( device, swapchain, imageReadySs[submissionNr] );
+			uint32_t nextSwapchainImageIndex = getNextImageIndex( device, presentQueue, swapchain, imageReadySs[submissionNr] );
 			unsafeSemaphore = false;
 
 			submitToQueue( graphicsQueue, commandBuffers[nextSwapchainImageIndex], imageReadySs[submissionNr], renderDoneSs[nextSwapchainImageIndex], submissionFences[submissionNr] );
@@ -566,8 +543,8 @@ int helloTriangle() try{
 
 	killCommandPool( device,  commandPool );
 
-	killBuffer( device, vertexBuffer );
 	killMemory( device, vertexBufferMemory );
+	killBuffer( device, vertexBuffer );
 
 	killPipelineLayout( device, pipelineLayout );
 	killShaderModule( device, fragmentShader );
@@ -762,14 +739,7 @@ void killInstance( const VkInstance instance ){
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-bool isPresentationSupported( const VkPhysicalDevice physDevice, const uint32_t queueFamily, const VkSurfaceKHR surface ){
-	VkBool32 supported;
-	const VkResult errorCode = vkGetPhysicalDeviceSurfaceSupportKHR( physDevice, queueFamily, surface, &supported ); RESULT_HANDLER( errorCode, "vkGetPhysicalDeviceSurfaceSupportKHR" );
-
-	return supported == VK_TRUE;
-}
-
-bool isPresentationSupported( const VkPhysicalDevice physDevice, const VkSurfaceKHR surface ){
+bool isPresentationSupported( const VkPhysicalDevice physDevice, const PlatformSurface surface ){
 	uint32_t qfCount;
 	vkGetPhysicalDeviceQueueFamilyProperties( physDevice, &qfCount, nullptr );
 
@@ -780,7 +750,7 @@ bool isPresentationSupported( const VkPhysicalDevice physDevice, const VkSurface
 	return false;
 }
 
-VkPhysicalDevice getPhysicalDevice( const VkInstance instance, const VkSurfaceKHR surface ){
+VkPhysicalDevice getPhysicalDevice( const VkInstance instance, const PlatformSurface surface ){
 	vector<VkPhysicalDevice> devices = enumerate<VkPhysicalDevice>( instance );
 
 	if( surface ){
@@ -845,7 +815,7 @@ vector<VkQueueFamilyProperties> getQueueFamilyProperties( VkPhysicalDevice devic
 	return queueFamilies;
 }
 
-std::pair<uint32_t, uint32_t> getQueueFamilies( const VkPhysicalDevice physDevice, const VkSurfaceKHR surface ){
+std::pair<uint32_t, uint32_t> getQueueFamilies( const VkPhysicalDevice physDevice, const PlatformSurface surface ){
 	constexpr uint32_t notFound = VK_QUEUE_FAMILY_IGNORED;
 	const auto qfps = getQueueFamilyProperties( physDevice );
 	const auto findQueueFamilyThat = [&qfps, notFound](std::function<bool (const VkQueueFamilyProperties&, const uint32_t)> predicate) -> uint32_t{
@@ -1127,161 +1097,6 @@ void killImageView( VkDevice device, VkImageView imageView ){
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-// initSurface is platform dependent
-
-void killSurface( VkInstance instance, VkSurfaceKHR surface ){
-	vkDestroySurfaceKHR( instance, surface, nullptr );
-}
-
-VkSurfaceFormatKHR getSurfaceFormat( VkPhysicalDevice physicalDevice, VkSurfaceKHR surface ){
-	const VkFormat preferredFormat1 = VK_FORMAT_B8G8R8A8_UNORM; 
-	const VkFormat preferredFormat2 = VK_FORMAT_B8G8R8A8_SRGB;
-
-	vector<VkSurfaceFormatKHR> formats = enumerate<VkSurfaceFormatKHR>( physicalDevice, surface );
-
-	if( formats.empty() ) throw "No surface formats offered by Vulkan!";
-
-	if( formats.size() == 1 && formats[0].format == VK_FORMAT_UNDEFINED ){
-		formats[0].format = preferredFormat1;
-	}
-
-	VkSurfaceFormatKHR chosenFormat1 = {VK_FORMAT_UNDEFINED};
-	VkSurfaceFormatKHR chosenFormat2 = {VK_FORMAT_UNDEFINED};
-
-	for( auto f : formats ){
-		if( f.format == preferredFormat1 ){
-			chosenFormat1 = f;
-			break;
-		}
-
-		if( f.format == preferredFormat2 ){
-			chosenFormat2 = f;
-		}
-	}
-
-	if( chosenFormat1.format ) return chosenFormat1;
-	else if( chosenFormat2.format ) return chosenFormat2;
-	else return formats[0];
-}
-
-VkSurfaceCapabilitiesKHR getSurfaceCapabilities( VkPhysicalDevice physicalDevice, VkSurfaceKHR surface ){
-	VkSurfaceCapabilitiesKHR capabilities;
-	VkResult errorCode = vkGetPhysicalDeviceSurfaceCapabilitiesKHR( physicalDevice, surface, &capabilities ); RESULT_HANDLER( errorCode, "vkGetPhysicalDeviceSurfaceCapabilitiesKHR" );
-
-	return capabilities;
-}
-
-int selectedMode = 0;
-
-TODO( "Could use debug_report instead of log" )
-VkPresentModeKHR getSurfacePresentMode( VkPhysicalDevice physicalDevice, VkSurfaceKHR surface ){
-	vector<VkPresentModeKHR> modes = enumerate<VkPresentModeKHR>( physicalDevice, surface );
-
-	for( auto m : modes ){
-		if( m == ::presentMode ){
-			if( selectedMode != 0 ){
-				logger << "INFO: Your preferred present mode became supported. Switching to it.\n";
-			}
-
-			selectedMode = 0;
-			return m;
-		}
-	}
-
-	for( auto m : modes ){
-		if( m == VK_PRESENT_MODE_FIFO_KHR ){
-			if( selectedMode != 1 ){
-				logger << "WARNING: Your preferred present mode is not supported. Switching to VK_PRESENT_MODE_FIFO_KHR.\n";
-			}
-
-			selectedMode = 1;
-			return m;
-		}
-	}
-
-	TODO( "Workaround for bad (Intel Linux Mesa) drivers" )
-	if( modes.empty() ) throw "Bugged driver reports no supported present modes.";
-	else{
-		if( selectedMode != 2 ){
-			logger << "WARNING: Bugged drivers. VK_PRESENT_MODE_FIFO_KHR not supported. Switching to whatever is.\n";
-		}
-
-		selectedMode = 2;
-		return modes[0];
-	}
-}
-
-VkSwapchainKHR initSwapchain(
-	VkPhysicalDevice physicalDevice,
-	VkDevice device,
-	VkSurfaceKHR surface,
-	VkSurfaceFormatKHR surfaceFormat,
-	VkSurfaceCapabilitiesKHR capabilities,
-	uint32_t graphicsQueueFamily,
-	uint32_t presentQueueFamily,
-	VkSwapchainKHR oldSwapchain
-){
-	// we don't care as we are always setting alpha to 1.0
-	VkCompositeAlphaFlagBitsKHR compositeAlphaFlag;
-	if( capabilities.supportedCompositeAlpha & VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR ) compositeAlphaFlag = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
-	else if( capabilities.supportedCompositeAlpha & VK_COMPOSITE_ALPHA_PRE_MULTIPLIED_BIT_KHR ) compositeAlphaFlag = VK_COMPOSITE_ALPHA_PRE_MULTIPLIED_BIT_KHR;
-	else if( capabilities.supportedCompositeAlpha & VK_COMPOSITE_ALPHA_POST_MULTIPLIED_BIT_KHR ) compositeAlphaFlag = VK_COMPOSITE_ALPHA_POST_MULTIPLIED_BIT_KHR;
-	else if( capabilities.supportedCompositeAlpha & VK_COMPOSITE_ALPHA_INHERIT_BIT_KHR ) compositeAlphaFlag = VK_COMPOSITE_ALPHA_INHERIT_BIT_KHR;
-	else throw "Unknown composite alpha reported.";
-
-	// minImageCount + 1 seems a sensible default. It means 2 images should always be readily available without blocking. May lead to memory waste though if we care about that.
-	uint32_t myMinImageCount = capabilities.minImageCount + 1;
-	if( capabilities.maxImageCount ) myMinImageCount = std::min<uint32_t>( myMinImageCount, capabilities.maxImageCount );
-
-	std::vector<uint32_t> queueFamilies = { graphicsQueueFamily };
-	if(graphicsQueueFamily != presentQueueFamily) queueFamilies.push_back( presentQueueFamily );
-
-	VkSwapchainCreateInfoKHR swapchainInfo{
-		VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
-		nullptr, // pNext for extensions use
-		0, // flags - reserved for future use
-		surface,
-		myMinImageCount, // minImageCount
-		surfaceFormat.format,
-		surfaceFormat.colorSpace,
-		capabilities.currentExtent,
-		1,
-		VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, // VkImage usage flags
-		// It should be fine to just use CONCURRENT in the off chance we encounter the elusive GPU with separate present queue
-		queueFamilies.size() > 1 ? VK_SHARING_MODE_CONCURRENT : VK_SHARING_MODE_EXCLUSIVE,
-		static_cast<uint32_t>( queueFamilies.size() ),
-		queueFamilies.data(),
-		capabilities.currentTransform,
-		compositeAlphaFlag,
-		getSurfacePresentMode( physicalDevice, surface ),
-		VK_TRUE, // clipped
-		oldSwapchain
-	};
-
-	VkSwapchainKHR swapchain;
-	VkResult errorCode = vkCreateSwapchainKHR( device, &swapchainInfo, nullptr, &swapchain ); RESULT_HANDLER( errorCode, "vkCreateSwapchainKHR" );
-
-	return swapchain;
-}
-
-void killSwapchain( VkDevice device, VkSwapchainKHR swapchain ){
-	vkDestroySwapchainKHR( device, swapchain, nullptr );
-}
-
-uint32_t getNextImageIndex( VkDevice device, VkSwapchainKHR swapchain, VkSemaphore imageReadyS ){
-	uint32_t nextImageIndex;
-	VkResult errorCode = vkAcquireNextImageKHR(
-		device,
-		swapchain,
-		UINT64_MAX /* no timeout */,
-		imageReadyS,
-		VK_NULL_HANDLE,
-		&nextImageIndex
-	); RESULT_HANDLER( errorCode, "vkAcquireNextImageKHR" );
-
-	return nextImageIndex;
-}
 
 vector<VkImageView> initSwapchainImageViews( VkDevice device, vector<VkImage> images, VkFormat format ){
 	vector<VkImageView> imageViews;
@@ -1890,31 +1705,6 @@ void submitToQueue( VkQueue queue, VkCommandBuffer commandBuffer, VkSemaphore im
 	const VkResult errorCode = vkQueueSubmit( queue, 1 /*submit count*/, &submit, fence ); RESULT_HANDLER( errorCode, "vkQueueSubmit" );
 }
 
-void present( VkQueue queue, VkSwapchainKHR swapchain, uint32_t swapchainImageIndex, VkSemaphore renderDoneS ){
-	const VkPresentInfoKHR presentInfo{
-		VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
-		nullptr, // pNext
-		1, &renderDoneS, // wait semaphores
-		1, &swapchain, &swapchainImageIndex,
-		nullptr // pResults
-	};
-
-	const VkResult errorCode = vkQueuePresentKHR( queue, &presentInfo ); RESULT_HANDLER( errorCode, "vkQueuePresentKHR" );
-}
-
-// cleanup dangerous semaphore with signal pending from vkAcquireNextImageKHR (tie it to a specific queue)
-// https://github.com/KhronosGroup/Vulkan-Docs/issues/1059
 void cleanupUnsafeSemaphore( VkQueue queue, VkSemaphore semaphore ){
-	VkPipelineStageFlags psw = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
-
-	const VkSubmitInfo submit{
-		VK_STRUCTURE_TYPE_SUBMIT_INFO,
-		nullptr, // pNext
-		1, &semaphore, // wait semaphores
-		&psw, // pipeline stages to wait for semaphore
-		0, nullptr, // command buffers
-		0, nullptr // signal semaphores
-	};
-
-	const VkResult errorCode = vkQueueSubmit( queue, 1 /*submit count*/, &submit, VK_NULL_HANDLE ); RESULT_HANDLER( errorCode, "vkQueueSubmit" );
+	// don't need, I know I am just using the Vulkan queue for now
 }

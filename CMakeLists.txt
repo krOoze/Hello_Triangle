@@ -4,7 +4,7 @@ project( HelloTriangle )
 set( TODO ON CACHE BOOL "Enable compiletime TODO messages" )
 
 # Select WSI platform (can use cmake -D)
-set( WSI "USE_PLATFORM_GLFW" CACHE STRING "WSI type used by this app" )
+set( WSI "VK_USE_PLATFORM_WIN32_KHR" CACHE STRING "WSI type used by this app" )
 message( "WSI: " ${WSI} )
 
 # Find Vulkan SDK
@@ -135,4 +135,4 @@ elseif( ${WSI} STREQUAL "VK_USE_PLATFORM_WAYLAND_KHR" )
 endif()
 add_definitions( -D${WSI} )
 
-target_link_libraries( HelloTriangle "${VULKAN_LIBRARY}" "${WSI_LIBS}" )
+target_link_libraries( HelloTriangle "${VULKAN_LIBRARY}" "${WSI_LIBS}" DXGI.lib DXGUID.lib D3D12.lib )
