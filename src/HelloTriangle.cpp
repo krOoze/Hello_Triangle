@@ -233,6 +233,8 @@ void recordDraw( VkCommandBuffer commandBuffer, uint32_t vertexCount );
 void submitToQueue( VkQueue queue, VkCommandBuffer commandBuffer, VkSemaphore imageReadyS, VkSemaphore renderDoneS, VkFence fence = VK_NULL_HANDLE );
 void present( VkQueue queue, VkSwapchainKHR swapchain, uint32_t swapchainImageIndex, VkSemaphore renderDoneS );
 
+// cleanup dangerous semaphore with signal pending from vkAcquireNextImageKHR
+void cleanupUnsafeSemaphore( VkQueue queue, VkSemaphore semaphore );
 
 
 // main()!
@@ -416,7 +418,6 @@ int helloTriangle() try{
 			killFences( device, submissionFences );
 
 			// semaphores might be in signaled state, so kill them too to get fresh unsignaled
-			TODO( "Unfortunately vkDeviceQueueIdle does not cover vkAcquireNextImage. This needs extra cleanup." )
 			killSemaphores( device, renderDoneSs );
 			killSemaphores( device, imageReadySs );
 
@@ -484,13 +485,19 @@ int helloTriangle() try{
 	const std::function<void(void)> render = [&](){
 		assert( swapchain ); // should be always true; should have yielded CPU if false
 
+		// vkAcquireNextImageKHR produces unsafe semaphore that needs extra cleanup. Track that with this variable.
+		bool unsafeSemaphore = false;
+
 		try{
 			// remove oldest frame from being in flight before starting new one
 			// refer to doc/, which talks about the cycle of how the synch primitives are (re)used here
 			{VkResult errorCode = vkWaitForFences( device, 1, &submissionFences[submissionNr], VK_TRUE, UINT64_MAX ); RESULT_HANDLER( errorCode, "vkWaitForFences" );}
 			{VkResult errorCode = vkResetFences( device, 1, &submissionFences[submissionNr] ); RESULT_HANDLER( errorCode, "vkResetFences" );}
 
+			unsafeSemaphore = true;
 			uint32_t nextSwapchainImageIndex = getNextImageIndex( device, swapchain, imageReadySs[submissionNr] );
+			unsafeSemaphore = false;
+
 			if( presentQueueFamily != graphicsQueueFamily ) vkQueueWaitIdle( presentQueue ); // in the obscure case of separate present queue, make sure the renderDoneS can be reused; not really worried about perf for this obscure case
 			submitToQueue( graphicsQueue, commandBuffers[nextSwapchainImageIndex], imageReadySs[submissionNr], renderDoneSs[submissionNr], submissionFences[submissionNr] );
 			present( presentQueue, swapchain, nextSwapchainImageIndex, renderDoneSs[submissionNr] );
@@ -499,6 +506,9 @@ int helloTriangle() try{
 		}
 		catch( VulkanResultException ex ){
 			if( ex.result == VK_SUBOPTIMAL_KHR || ex.result == VK_ERROR_OUT_OF_DATE_KHR ){
+				if( unsafeSemaphore && ex.result == VK_SUBOPTIMAL_KHR ){
+					cleanupUnsafeSemaphore( graphicsQueue, imageReadySs[submissionNr] );
+				}
 				recreateSwapchain();
 
 				// we need to start over...
@@ -1854,34 +1864,45 @@ void recordDraw( VkCommandBuffer commandBuffer, const uint32_t vertexCount ){
 }
 
 void submitToQueue( VkQueue queue, VkCommandBuffer commandBuffer, VkSemaphore imageReadyS, VkSemaphore renderDoneS, VkFence fence ){
-	VkPipelineStageFlags psw = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+	const VkPipelineStageFlags psw = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
 
-	VkSubmitInfo submit{
+	const VkSubmitInfo submit{
 		VK_STRUCTURE_TYPE_SUBMIT_INFO,
 		nullptr, // pNext
-		1, // wait semaphore count
-		&imageReadyS, // semaphores
+		1, &imageReadyS, // wait semaphores
 		&psw, // pipeline stages to wait for semaphore
-		1,
-		&commandBuffer,
-		1, // signal semaphore count
-		&renderDoneS // signal semaphores
+		1, &commandBuffer,
+		1, &renderDoneS // signal semaphores
 	};
 
-	VkResult errorCode = vkQueueSubmit( queue, 1 /*submit count*/, &submit, fence ); RESULT_HANDLER( errorCode, "vkQueueSubmit" );
+	const VkResult errorCode = vkQueueSubmit( queue, 1 /*submit count*/, &submit, fence ); RESULT_HANDLER( errorCode, "vkQueueSubmit" );
 }
 
 void present( VkQueue queue, VkSwapchainKHR swapchain, uint32_t swapchainImageIndex, VkSemaphore renderDoneS ){
-	VkPresentInfoKHR presentInfo{
+	const VkPresentInfoKHR presentInfo{
 		VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
 		nullptr, // pNext
-		1, // wait semaphore count
-		&renderDoneS, // wait semaphores
-		1, // swapchain count
-		&swapchain,
-		&swapchainImageIndex,
+		1, &renderDoneS, // wait semaphores
+		1, &swapchain, &swapchainImageIndex,
 		nullptr // pResults
 	};
 
-	VkResult errorCode = vkQueuePresentKHR( queue, &presentInfo ); RESULT_HANDLER( errorCode, "vkQueuePresentKHR" );
+	const VkResult errorCode = vkQueuePresentKHR( queue, &presentInfo ); RESULT_HANDLER( errorCode, "vkQueuePresentKHR" );
+}
+
+// cleanup dangerous semaphore with signal pending from vkAcquireNextImageKHR (tie it to a specific queue)
+// https://github.com/KhronosGroup/Vulkan-Docs/issues/152
+void cleanupUnsafeSemaphore( VkQueue queue, VkSemaphore semaphore ){
+	VkPipelineStageFlags psw = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
+
+	const VkSubmitInfo submit{
+		VK_STRUCTURE_TYPE_SUBMIT_INFO,
+		nullptr, // pNext
+		1, &semaphore, // wait semaphores
+		&psw, // pipeline stages to wait for semaphore
+		0, nullptr, // command buffers
+		0, nullptr // signal semaphores
+	};
+
+	const VkResult errorCode = vkQueueSubmit( queue, 1 /*submit count*/, &submit, VK_NULL_HANDLE ); RESULT_HANDLER( errorCode, "vkQueueSubmit" );
 }
