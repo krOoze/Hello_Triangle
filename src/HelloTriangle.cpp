@@ -79,6 +79,8 @@ constexpr VkPresentModeKHR presentMode = VK_PRESENT_MODE_FIFO_KHR;
 // pipeline settings
 constexpr VkClearValue clearColor = {  { {0.1f, 0.1f, 0.1f, 1.0f} }  };
 
+// Makes present queue from different Queue Family than Graphics, for testing purposes
+constexpr bool forceSeparatePresentQueue = false;
 
 // needed stuff for main() -- forward declarations
 //////////////////////////////////////////////////////////////////////////////////
@@ -414,6 +416,7 @@ int helloTriangle() try{
 			killFences( device, submissionFences );
 
 			// semaphores might be in signaled state, so kill them too to get fresh unsignaled
+			TODO( "Unfortunately vkDeviceQueueIdle does not cover vkAcquireNextImage. This needs extra cleanup." )
 			killSemaphores( device, renderDoneSs );
 			killSemaphores( device, imageReadySs );
 
@@ -483,10 +486,12 @@ int helloTriangle() try{
 
 		try{
 			// remove oldest frame from being in flight before starting new one
+			// refer to doc/, which talks about the cycle of how the synch primitives are (re)used here
 			{VkResult errorCode = vkWaitForFences( device, 1, &submissionFences[submissionNr], VK_TRUE, UINT64_MAX ); RESULT_HANDLER( errorCode, "vkWaitForFences" );}
 			{VkResult errorCode = vkResetFences( device, 1, &submissionFences[submissionNr] ); RESULT_HANDLER( errorCode, "vkResetFences" );}
 
 			uint32_t nextSwapchainImageIndex = getNextImageIndex( device, swapchain, imageReadySs[submissionNr] );
+			if( presentQueueFamily != graphicsQueueFamily ) vkQueueWaitIdle( presentQueue ); // in the obscure case of separate present queue, make sure the renderDoneS can be reused; not really worried about perf for this obscure case
 			submitToQueue( graphicsQueue, commandBuffers[nextSwapchainImageIndex], imageReadySs[submissionNr], renderDoneSs[submissionNr], submissionFences[submissionNr] );
 			present( presentQueue, swapchain, nextSwapchainImageIndex, renderDoneSs[submissionNr] );
 
@@ -819,25 +824,33 @@ std::pair<uint32_t, uint32_t> getQueueFamilies( const VkPhysicalDevice physDevic
 	using std::make_pair;
 	const auto qfps = getQueueFamilyProperties( physDevice );
 
-	// find fused graphics and present family
-	for( uint32_t queueFamily = 0; queueFamily < qfps.size(); ++queueFamily){
-		if(  (qfps[queueFamily].queueFlags & VK_QUEUE_GRAPHICS_BIT) && isPresentationSupported( physDevice, queueFamily, surface )  ){
-			return make_pair( queueFamily, queueFamily );
-		}
-	}
-
 	uint32_t graphicsQueueFamily = VK_QUEUE_FAMILY_IGNORED;
 	uint32_t presentQueueFamily = VK_QUEUE_FAMILY_IGNORED;
 
-	for( uint32_t queueFamily = 0; queueFamily < qfps.size(); ++queueFamily ){
-		if( qfps[queueFamily].queueFlags & VK_QUEUE_GRAPHICS_BIT ){
-			graphicsQueueFamily = queueFamily;
+	if( !::forceSeparatePresentQueue ){
+		// find fused graphics and present family
+		for( uint32_t queueFamily = 0; queueFamily < qfps.size(); ++queueFamily){
+			if(  (qfps[queueFamily].queueFlags & VK_QUEUE_GRAPHICS_BIT) && isPresentationSupported( physDevice, queueFamily, surface )  ){
+				graphicsQueueFamily = queueFamily;
+				presentQueueFamily = queueFamily;
+				break;
+			}
 		}
 	}
 
-	for( uint32_t queueFamily = 0; queueFamily < qfps.size(); ++queueFamily ){
-		if(  isPresentationSupported( physDevice, queueFamily, surface )  ){
-			presentQueueFamily = queueFamily;
+	// if not found
+	if( graphicsQueueFamily == VK_QUEUE_FAMILY_IGNORED || presentQueueFamily == VK_QUEUE_FAMILY_IGNORED ){
+		for( uint32_t queueFamily = 0; queueFamily < qfps.size(); ++queueFamily ){
+			if( qfps[queueFamily].queueFlags & VK_QUEUE_GRAPHICS_BIT ){
+				graphicsQueueFamily = queueFamily;
+			}
+		}
+
+		for( uint32_t queueFamily = 0; queueFamily < qfps.size(); ++queueFamily ){
+			if(  isPresentationSupported( physDevice, queueFamily, surface )  ){
+				if( !::forceSeparatePresentQueue || queueFamily != graphicsQueueFamily )
+					presentQueueFamily = queueFamily;
+			}
 		}
 	}
 

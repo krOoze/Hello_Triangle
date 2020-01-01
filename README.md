@@ -109,6 +109,7 @@ variables in `HelloTriangle.cpp`.
 | `initialWindowHeight` | The initial height of the rendered window | `800` |
 | `presentMode` | The presentation mode of Vulkan used in swapchain | `VK_PRESENT_MODE_FIFO_KHR` <sup>1</sup>|
 | `clearColor` | Background color of the rendering | gray (`{0.1f, 0.1f, 0.1f, 1.0f}`) |
+| `forceSeparatePresentQueue` | By default the app prioritizes single Graphics and Present queue. This will create separate queues for testing purposes. There are virtually no platforms currently that naturally have separate Present queue family. |
 
 <sup>1</sup> I preferred `VK_PRESENT_MODE_IMMEDIATE_KHR` before but it tends to
 make coil whine because of the extreme FPS (which could be unnecessarily
