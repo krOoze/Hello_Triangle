@@ -16,8 +16,8 @@
 #include <unistd.h>
 #include <vulkan/vulkan.h>
 
-#include "xdg-shell-client-protocol.h"
-#include "xdg-shell-client-protocol-private.inl"
+#include "private/xdg-shell-client-protocol.h"
+#include "private/xdg-shell-client-protocol-private.inl"
 #include "CompilerMessages.h"
 #include "ErrorHandling.h"
 
