@@ -379,7 +379,7 @@ int helloTriangle() try{
 	vector<VkCommandBuffer> commandBuffers;
 
 	vector<VkSemaphore> imageReadySs;
-	vector<VkSemaphore> renderDoneSs;
+	VkSemaphore renderDoneS = VK_NULL_HANDLE; // has to be NULL for the case the app ends before even first swapchain
 
 	// workaround for validation layer "memory leak" + might also help the driver to cleanup old resources
 	// this should not be needed for a real-word app, because they are likely to use fences naturaly (e.g. responding to user input )
@@ -418,7 +418,7 @@ int helloTriangle() try{
 			killFences( device, submissionFences );
 
 			// semaphores might be in signaled state, so kill them too to get fresh unsignaled
-			killSemaphores( device, renderDoneSs );
+			killSemaphore( device, renderDoneS );
 			killSemaphores( device, imageReadySs );
 
 			// only reset + later reuse already allocated and create new only if needed
@@ -471,7 +471,7 @@ int helloTriangle() try{
 			}
 
 			imageReadySs = initSemaphores( device, maxInflightSubmissions );
-			renderDoneSs = initSemaphores( device, maxInflightSubmissions );
+			renderDoneS = initSemaphore( device );
 
 			submissionFences = initFences( device, maxInflightSubmissions, VK_FENCE_CREATE_SIGNALED_BIT ); // signaled fence means previous execution finished, so we start rendering presignaled
 			submissionNr = 0;
@@ -499,8 +499,8 @@ int helloTriangle() try{
 			unsafeSemaphore = false;
 
 			if( presentQueueFamily != graphicsQueueFamily ) vkQueueWaitIdle( presentQueue ); // in the obscure case of separate present queue, make sure the renderDoneS can be reused; not really worried about perf for this obscure case
-			submitToQueue( graphicsQueue, commandBuffers[nextSwapchainImageIndex], imageReadySs[submissionNr], renderDoneSs[submissionNr], submissionFences[submissionNr] );
-			present( presentQueue, swapchain, nextSwapchainImageIndex, renderDoneSs[submissionNr] );
+			submitToQueue( graphicsQueue, commandBuffers[nextSwapchainImageIndex], imageReadySs[submissionNr], renderDoneS, submissionFences[submissionNr] );
+			present( presentQueue, swapchain, nextSwapchainImageIndex, renderDoneS );
 
 			submissionNr = (submissionNr + 1) % maxInflightSubmissions;
 		}
@@ -533,7 +533,7 @@ int helloTriangle() try{
 
 
 	// kill swapchain
-	killSemaphores( device, renderDoneSs );
+	killSemaphore( device, renderDoneS );
 	killSemaphores( device, imageReadySs );
 
 	// command buffers killed with pool
