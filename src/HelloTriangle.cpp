@@ -1891,7 +1891,7 @@ void present( VkQueue queue, VkSwapchainKHR swapchain, uint32_t swapchainImageIn
 }
 
 // cleanup dangerous semaphore with signal pending from vkAcquireNextImageKHR (tie it to a specific queue)
-// https://github.com/KhronosGroup/Vulkan-Docs/issues/152
+// https://github.com/KhronosGroup/Vulkan-Docs/issues/1059
 void cleanupUnsafeSemaphore( VkQueue queue, VkSemaphore semaphore ){
 	VkPipelineStageFlags psw = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
 
