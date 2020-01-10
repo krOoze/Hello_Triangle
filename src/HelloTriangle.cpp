@@ -379,7 +379,7 @@ int helloTriangle() try{
 	vector<VkCommandBuffer> commandBuffers;
 
 	vector<VkSemaphore> imageReadySs;
-	VkSemaphore renderDoneS = VK_NULL_HANDLE; // has to be NULL for the case the app ends before even first swapchain
+	vector<VkSemaphore> renderDoneSs;
 
 	// workaround for validation layer "memory leak" + might also help the driver to cleanup old resources
 	// this should not be needed for a real-word app, because they are likely to use fences naturaly (e.g. responding to user input )
@@ -392,6 +392,9 @@ int helloTriangle() try{
 	const std::function<bool(void)> recreateSwapchain = [&](){
 		// swapchain recreation -- will be done before the first frame too;
 		TODO( "This may be triggered from many sources (e.g. WM_SIZE event, and VK_ERROR_OUT_OF_DATE_KHR too). Should prevent duplicate swapchain recreation." )
+
+		const VkSwapchainKHR oldSwapchain = swapchain;
+		swapchain = VK_NULL_HANDLE;
 
 		VkSurfaceCapabilitiesKHR capabilities = getSurfaceCapabilities( physicalDevice, surface );
 
@@ -410,16 +413,18 @@ int helloTriangle() try{
 			&& surfaceSize.height > 0
 		};
 
+
 		// cleanup old
-		if( swapchain ){
+		vector<VkSemaphore> oldImageReadySs = imageReadySs; imageReadySs.clear();
+		if( oldSwapchain ){
 			{VkResult errorCode = vkDeviceWaitIdle( device ); RESULT_HANDLER( errorCode, "vkDeviceWaitIdle" );}
 
 			// fences might be in unsignaled state, so kill them too to get fresh signaled
 			killFences( device, submissionFences );
 
 			// semaphores might be in signaled state, so kill them too to get fresh unsignaled
-			killSemaphore( device, renderDoneS );
-			killSemaphores( device, imageReadySs );
+			killSemaphores( device, renderDoneSs );
+			// kill imageReadySs later when oldSwapchain is destroyed
 
 			// only reset + later reuse already allocated and create new only if needed
 			{VkResult errorCode = vkResetCommandPool( device, commandPool, 0 ); RESULT_HANDLER( errorCode, "vkResetCommandPool" );}
@@ -428,18 +433,13 @@ int helloTriangle() try{
 			killFramebuffers( device, framebuffers );
 			killSwapchainImageViews( device, swapchainImageViews );
 
-			if( !swapchainCreatable ){
-				// we need to wait for size that is compatible with swapchain
-				// so just destroy swapchain to conserve resources in the meantime
-				killSwapchain( device, swapchain );
-				swapchain = VK_NULL_HANDLE;
-			}
+			// kill oldSwapchain later, after it is potentially used by vkCreateSwapchainKHR
 		}
 
 		// creating new
 		if( swapchainCreatable ){
 			// reuses & destroys the oldSwapchain
-			swapchain = initSwapchain( physicalDevice, device, surface, surfaceFormat, capabilities, graphicsQueueFamily, presentQueueFamily, swapchain );
+			swapchain = initSwapchain( physicalDevice, device, surface, surfaceFormat, capabilities, graphicsQueueFamily, presentQueueFamily, oldSwapchain );
 
 			vector<VkImage> swapchainImages = enumerate<VkImage>( device, swapchain );
 			swapchainImageViews = initSwapchainImageViews( device, swapchainImages, surfaceFormat.format );
@@ -471,10 +471,19 @@ int helloTriangle() try{
 			}
 
 			imageReadySs = initSemaphores( device, maxInflightSubmissions );
-			renderDoneS = initSemaphore( device );
+			// per https://github.com/KhronosGroup/Vulkan-Docs/issues/1150 need upto swapchain-image count
+			renderDoneSs = initSemaphores( device, swapchainImages.size());
 
 			submissionFences = initFences( device, maxInflightSubmissions, VK_FENCE_CREATE_SIGNALED_BIT ); // signaled fence means previous execution finished, so we start rendering presignaled
 			submissionNr = 0;
+		}
+
+		if( oldSwapchain ){
+			killSwapchain( device, oldSwapchain );
+
+			// per current spec, we can't really be sure these are not used :/ at least kill them after the swapchain
+			// https://github.com/KhronosGroup/Vulkan-Docs/issues/152
+			killSemaphores( device, oldImageReadySs );
 		}
 
 		return swapchain != VK_NULL_HANDLE;
@@ -498,9 +507,8 @@ int helloTriangle() try{
 			uint32_t nextSwapchainImageIndex = getNextImageIndex( device, swapchain, imageReadySs[submissionNr] );
 			unsafeSemaphore = false;
 
-			if( presentQueueFamily != graphicsQueueFamily ) vkQueueWaitIdle( presentQueue ); // in the obscure case of separate present queue, make sure the renderDoneS can be reused; not really worried about perf for this obscure case
-			submitToQueue( graphicsQueue, commandBuffers[nextSwapchainImageIndex], imageReadySs[submissionNr], renderDoneS, submissionFences[submissionNr] );
-			present( presentQueue, swapchain, nextSwapchainImageIndex, renderDoneS );
+			submitToQueue( graphicsQueue, commandBuffers[nextSwapchainImageIndex], imageReadySs[submissionNr], renderDoneSs[nextSwapchainImageIndex], submissionFences[submissionNr] );
+			present( presentQueue, swapchain, nextSwapchainImageIndex, renderDoneSs[nextSwapchainImageIndex] );
 
 			submissionNr = (submissionNr + 1) % maxInflightSubmissions;
 		}
@@ -508,6 +516,7 @@ int helloTriangle() try{
 			if( ex.result == VK_SUBOPTIMAL_KHR || ex.result == VK_ERROR_OUT_OF_DATE_KHR ){
 				if( unsafeSemaphore && ex.result == VK_SUBOPTIMAL_KHR ){
 					cleanupUnsafeSemaphore( graphicsQueue, imageReadySs[submissionNr] );
+					// no way to sanitize vkQueuePresentKHR semaphores, really
 				}
 				recreateSwapchain();
 
@@ -533,8 +542,8 @@ int helloTriangle() try{
 
 
 	// kill swapchain
-	killSemaphore( device, renderDoneS );
-	killSemaphores( device, imageReadySs );
+	killSemaphores( device, renderDoneSs );
+	// imageReadySs killed after the swapchain
 
 	// command buffers killed with pool
 
@@ -544,6 +553,10 @@ int helloTriangle() try{
 
 	killSwapchainImageViews( device, swapchainImageViews );
 	killSwapchain( device, swapchain );
+
+	// per current spec, we can't really be sure these are not used :/ at least kill them after the swapchain
+	// https://github.com/KhronosGroup/Vulkan-Docs/issues/152
+	killSemaphores( device, imageReadySs );
 
 
 	// kill vulkan
@@ -1247,8 +1260,6 @@ VkSwapchainKHR initSwapchain(
 
 	VkSwapchainKHR swapchain;
 	VkResult errorCode = vkCreateSwapchainKHR( device, &swapchainInfo, nullptr, &swapchain ); RESULT_HANDLER( errorCode, "vkCreateSwapchainKHR" );
-
-	killSwapchain( device, oldSwapchain );
 
 	return swapchain;
 }
