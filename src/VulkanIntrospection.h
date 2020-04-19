@@ -13,7 +13,7 @@ template <typename PHANDLE_T>
 inline uint64_t handleToUint64(const PHANDLE_T *h) { return reinterpret_cast<uint64_t>(h); }
 inline uint64_t handleToUint64(const uint64_t h) { return h; }
 
-const char* to_string( VkResult r ){
+const char* to_string( const VkResult r ){
 	switch( r ){
 		case VK_SUCCESS: return "VK_SUCCESS";
 		case VK_NOT_READY: return "VK_NOT_READY";
@@ -33,8 +33,11 @@ const char* to_string( VkResult r ){
 		case VK_ERROR_TOO_MANY_OBJECTS: return "VK_ERROR_TOO_MANY_OBJECTS";
 		case VK_ERROR_FORMAT_NOT_SUPPORTED: return "VK_ERROR_FORMAT_NOT_SUPPORTED";
 		case VK_ERROR_FRAGMENTED_POOL: return "VK_ERROR_FRAGMENTED_POOL";
+		case VK_ERROR_UNKNOWN: return "VK_ERROR_UNKNOWN";
 		case VK_ERROR_OUT_OF_POOL_MEMORY: return "VK_ERROR_OUT_OF_POOL_MEMORY";
 		case VK_ERROR_INVALID_EXTERNAL_HANDLE: return "VK_ERROR_INVALID_EXTERNAL_HANDLE";
+		case VK_ERROR_FRAGMENTATION: return "VK_ERROR_FRAGMENTATION";
+		case VK_ERROR_INVALID_OPAQUE_CAPTURE_ADDRESS: "VK_ERROR_INVALID_OPAQUE_CAPTURE_ADDRESS";
 		case VK_ERROR_SURFACE_LOST_KHR: return "VK_ERROR_SURFACE_LOST_KHR";
 		case VK_ERROR_NATIVE_WINDOW_IN_USE_KHR: return "VK_ERROR_NATIVE_WINDOW_IN_USE_KHR";
 		case VK_SUBOPTIMAL_KHR: return "VK_SUBOPTIMAL_KHR";
@@ -43,8 +46,9 @@ const char* to_string( VkResult r ){
 		case VK_ERROR_VALIDATION_FAILED_EXT: return "VK_ERROR_VALIDATION_FAILED_EXT";
 		case VK_ERROR_INVALID_SHADER_NV: return "VK_ERROR_INVALID_SHADER_NV";
 		case VK_ERROR_INVALID_DRM_FORMAT_MODIFIER_PLANE_LAYOUT_EXT: return "VK_ERROR_INVALID_DRM_FORMAT_MODIFIER_PLANE_LAYOUT_EXT";
-		case VK_ERROR_FRAGMENTATION_EXT: return "VK_ERROR_FRAGMENTATION_EXT";
 		case VK_ERROR_NOT_PERMITTED_EXT: return "VK_ERROR_NOT_PERMITTED_EXT";
+		case VK_ERROR_FULL_SCREEN_EXCLUSIVE_MODE_LOST_EXT: return "VK_ERROR_FULL_SCREEN_EXCLUSIVE_MODE_LOST_EXT";
+		case VK_ERROR_PIPELINE_COMPILE_REQUIRED_EXT: return "VK_ERROR_PIPELINE_COMPILE_REQUIRED_EXT";
 		default: return "unrecognized VkResult code";
 	}
 }
@@ -82,12 +86,10 @@ std::string to_string( const VkDebugReportObjectTypeEXT o ){
 		case VK_DEBUG_REPORT_OBJECT_TYPE_DEBUG_REPORT_CALLBACK_EXT_EXT: return "DebugReportCallbackEXT";
 		case VK_DEBUG_REPORT_OBJECT_TYPE_DISPLAY_KHR_EXT: return "DisplayKHR";
 		case VK_DEBUG_REPORT_OBJECT_TYPE_DISPLAY_MODE_KHR_EXT: return "DisplayModeKHR";
-		case VK_DEBUG_REPORT_OBJECT_TYPE_OBJECT_TABLE_NVX_EXT: return "ObjectTableNVX";
-		case VK_DEBUG_REPORT_OBJECT_TYPE_INDIRECT_COMMANDS_LAYOUT_NVX_EXT: return "IndirectCommandsLayoutNVX";
 		case VK_DEBUG_REPORT_OBJECT_TYPE_VALIDATION_CACHE_EXT_EXT: return "ValidationCacheEXT";
 		case VK_DEBUG_REPORT_OBJECT_TYPE_SAMPLER_YCBCR_CONVERSION_EXT: return "SamplerYcbcrConversion";
+		case VK_DEBUG_REPORT_OBJECT_TYPE_DESCRIPTOR_UPDATE_TEMPLATE_EXT: return "DescriptorUpdateTemplate";
 		case VK_DEBUG_REPORT_OBJECT_TYPE_ACCELERATION_STRUCTURE_NV_EXT: return "AccelerationStructureNV";
-		case VK_DEBUG_REPORT_OBJECT_TYPE_DESCRIPTOR_UPDATE_TEMPLATE_KHR_EXT: return "DescriptorUpdateTemplateKHR";
 		default: return "unrecognized type";
 	}
 }
@@ -127,11 +129,11 @@ std::string to_string( const VkObjectType o ){
 		case VK_OBJECT_TYPE_DISPLAY_KHR: return "DisplayKHR";
 		case VK_OBJECT_TYPE_DISPLAY_MODE_KHR: return "DisplayModeKHR";
 		case VK_OBJECT_TYPE_DEBUG_REPORT_CALLBACK_EXT: return "DebugReportCallbackEXT";
-		case VK_OBJECT_TYPE_OBJECT_TABLE_NVX: return "ObjectTableNVX";
-		case VK_OBJECT_TYPE_INDIRECT_COMMANDS_LAYOUT_NVX: return "IndirectCommandsLayoutNVX";
 		case VK_OBJECT_TYPE_DEBUG_UTILS_MESSENGER_EXT: return "DebugUtilsMessengerEXT";
 		case VK_OBJECT_TYPE_VALIDATION_CACHE_EXT: return "ValidationCacheEXT";
 		case VK_OBJECT_TYPE_ACCELERATION_STRUCTURE_NV: return "AccelerationStructureNV";
+		case VK_OBJECT_TYPE_PERFORMANCE_CONFIGURATION_INTEL: return "PerformanceConfigurationINTEL";
+		case VK_OBJECT_TYPE_INDIRECT_COMMANDS_LAYOUT_NV: return "IndirectCommandsLayoutNV";
 		default: return "unrecognized type";
 	}
 }
