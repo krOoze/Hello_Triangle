@@ -844,43 +844,44 @@ vector<VkQueueFamilyProperties> getQueueFamilyProperties( VkPhysicalDevice devic
 }
 
 std::pair<uint32_t, uint32_t> getQueueFamilies( const VkPhysicalDevice physDevice, const VkSurfaceKHR surface ){
-	using std::make_pair;
+	constexpr uint32_t notFound = VK_QUEUE_FAMILY_IGNORED;
 	const auto qfps = getQueueFamilyProperties( physDevice );
+	const auto findQueueFamilyThat = [&qfps, notFound](std::function<bool (const VkQueueFamilyProperties&, const uint32_t)> predicate) -> uint32_t{
+		for( uint32_t qf = 0; qf < qfps.size(); ++qf ) if( predicate(qfps[qf], qf) ) return qf;
+		return notFound;
+	};
 
-	uint32_t graphicsQueueFamily = VK_QUEUE_FAMILY_IGNORED;
-	uint32_t presentQueueFamily = VK_QUEUE_FAMILY_IGNORED;
+	const auto isGraphics = [](const VkQueueFamilyProperties& props, const uint32_t = 0){
+		return props.queueFlags & VK_QUEUE_GRAPHICS_BIT;
+	};
+	const auto isPresent = [=](const VkQueueFamilyProperties&, const uint32_t queueFamily){
+		return isPresentationSupported( physDevice, queueFamily, surface );
+	};
+	const auto isFusedGraphicsAndPresent = [=](const VkQueueFamilyProperties& props, const uint32_t queueFamily){
+		return isGraphics( props ) && isPresent( props, queueFamily );
+	};
 
-	if( !::forceSeparatePresentQueue ){
-		// find fused graphics and present family
-		for( uint32_t queueFamily = 0; queueFamily < qfps.size(); ++queueFamily){
-			if(  (qfps[queueFamily].queueFlags & VK_QUEUE_GRAPHICS_BIT) && isPresentationSupported( physDevice, queueFamily, surface )  ){
-				graphicsQueueFamily = queueFamily;
-				presentQueueFamily = queueFamily;
-				break;
-			}
+	uint32_t graphicsQueueFamily, presentQueueFamily;
+	if( ::forceSeparatePresentQueue ){
+		graphicsQueueFamily = findQueueFamilyThat( isGraphics );
+
+		const auto isSeparatePresent = [graphicsQueueFamily, isPresent](const VkQueueFamilyProperties& props, const uint32_t queueFamily){
+			return queueFamily != graphicsQueueFamily && isPresent( props, queueFamily );
+		};
+		findQueueFamilyThat( isSeparatePresent );
+	}
+	else{
+		graphicsQueueFamily = presentQueueFamily = findQueueFamilyThat( isFusedGraphicsAndPresent );
+		if( graphicsQueueFamily == notFound || presentQueueFamily == notFound ){
+			graphicsQueueFamily = findQueueFamilyThat( isGraphics );
+			presentQueueFamily = findQueueFamilyThat( isPresent );
 		}
 	}
 
-	// if not found
-	if( graphicsQueueFamily == VK_QUEUE_FAMILY_IGNORED || presentQueueFamily == VK_QUEUE_FAMILY_IGNORED ){
-		for( uint32_t queueFamily = 0; queueFamily < qfps.size(); ++queueFamily ){
-			if( qfps[queueFamily].queueFlags & VK_QUEUE_GRAPHICS_BIT ){
-				graphicsQueueFamily = queueFamily;
-			}
-		}
+	if( graphicsQueueFamily == notFound ) throw "Cannot find a graphics queue family!";
+	if( presentQueueFamily == notFound ) throw "Cannot find a presentation queue family!";
 
-		for( uint32_t queueFamily = 0; queueFamily < qfps.size(); ++queueFamily ){
-			if(  isPresentationSupported( physDevice, queueFamily, surface )  ){
-				if( !::forceSeparatePresentQueue || queueFamily != graphicsQueueFamily )
-					presentQueueFamily = queueFamily;
-			}
-		}
-	}
-
-	if( graphicsQueueFamily == VK_QUEUE_FAMILY_IGNORED ) throw "Cannot find a graphics queue family!";
-	if( presentQueueFamily == VK_QUEUE_FAMILY_IGNORED ) throw "Cannot find a presentation queue family!";
-
-	return make_pair( graphicsQueueFamily, presentQueueFamily );
+	return std::make_pair( graphicsQueueFamily, presentQueueFamily );
 }
 
 VkDevice initDevice(
