@@ -72,6 +72,4 @@
 	//#error "Unsupported OS platform." // caught in main.cpp instead
 #endif
 
-TODO( "Add other (all would be awesome) platforms" )
-
 #endif //COMMON_VULKAN_ENVIRONMENT_H

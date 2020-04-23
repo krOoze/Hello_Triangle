@@ -275,13 +275,13 @@ int helloTriangle() try{
 	};
 
 #if VULKAN_VALIDATION
-	DebugObjectVariant::DebugObjectTag debugExtensionTag;
+	DebugObjectType debugExtensionTag;
 	if(  isExtensionSupported( VK_EXT_DEBUG_UTILS_EXTENSION_NAME, supportedInstanceExtensions )  ){
-		debugExtensionTag = DebugObjectVariant::debugUtilsType;
+		debugExtensionTag = DebugObjectType::debugUtils;
 		requestedInstanceExtensions.push_back( VK_EXT_DEBUG_UTILS_EXTENSION_NAME );
 	}
 	else if(  isExtensionSupported( VK_EXT_DEBUG_REPORT_EXTENSION_NAME, supportedInstanceExtensions )  ){
-		debugExtensionTag = DebugObjectVariant::debugReportType;
+		debugExtensionTag = DebugObjectType::debugReport;
 		requestedInstanceExtensions.push_back( VK_EXT_DEBUG_REPORT_EXTENSION_NAME );
 	}
 	else throw "VULKAN_VALIDATION is enabled but neither VK_EXT_debug_utils nor VK_EXT_debug_report extension is supported!";
@@ -297,7 +297,7 @@ int helloTriangle() try{
 
 	const int32_t uncoded = 0;
 	const char* introMsg = "Validation Layers are enabled!";
-	if( debugExtensionTag == DebugObjectVariant::debugUtilsType ){
+	if( debugExtensionTag == DebugObjectType::debugUtils ){
 		VkDebugUtilsObjectNameInfoEXT object = {
 			VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT,
 			nullptr, // pNext
@@ -317,7 +317,7 @@ int helloTriangle() try{
 		};
 		vkSubmitDebugUtilsMessageEXT( instance, VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT, VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT, &dumcd );
 	}
-	else if( debugExtensionTag == DebugObjectVariant::debugReportType ){
+	else if( debugExtensionTag == DebugObjectType::debugReport ){
 		vkDebugReportMessageEXT( instance, VK_DEBUG_REPORT_PERFORMANCE_WARNING_BIT_EXT, VK_DEBUG_REPORT_OBJECT_TYPE_INSTANCE_EXT, (uint64_t)instance, __LINE__, uncoded, "Application", introMsg );
 	}
 #endif

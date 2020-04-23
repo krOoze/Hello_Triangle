@@ -30,7 +30,7 @@ struct VulkanResultException{
 // just use cout for logging now
 std::ostream& logger = std::cout;
 
-enum Highlight{ highlightOff = 0, highlightOn };
+enum class Highlight{ off, on };
 void genericDebugCallback( std::string flags, Highlight highlight, std::string msgCode, std::string object, const char* message );
 
 VKAPI_ATTR VkBool32 VKAPI_CALL genericDebugReportCallback(
@@ -51,15 +51,16 @@ VKAPI_ATTR VkBool32 VKAPI_CALL genericDebugUtilsCallback(
 	void* /*pUserData*/
 );
 
+enum class DebugObjectType{ debugReport, debugUtils } tag;
 struct DebugObjectVariant{
-	enum DebugObjectTag{ debugReportType, debugUtilsType } tag;
+	DebugObjectType tag;
 	union{
 		VkDebugReportCallbackEXT debugReportCallback;
 		VkDebugUtilsMessengerEXT debugUtilsMessenger;
 	};
 };
 
-DebugObjectVariant initDebug( const VkInstance instance, const DebugObjectVariant::DebugObjectTag debugExtension, const VkDebugUtilsMessageSeverityFlagsEXT debugSeverity, const VkDebugUtilsMessageTypeFlagsEXT debugType );
+DebugObjectVariant initDebug( const VkInstance instance, const DebugObjectType debugExtension, const VkDebugUtilsMessageSeverityFlagsEXT debugSeverity, const VkDebugUtilsMessageTypeFlagsEXT debugType );
 void killDebug( VkInstance instance, DebugObjectVariant debug );
 
 VkDebugReportFlagsEXT translateFlags( const VkDebugUtilsMessageSeverityFlagsEXT debugSeverity, const VkDebugUtilsMessageTypeFlagsEXT debugType );
@@ -73,7 +74,7 @@ void genericDebugCallback( std::string flags, Highlight highlight, std::string m
 
 	const string report = flags + ": " + object + ": " + msgCode + ", \"" + message + '"';
 
-	if( highlight ){
+	if( highlight != Highlight::off ){
 			const string border( 80, '!' );
 
 			logger << border << endl;
@@ -100,9 +101,9 @@ VKAPI_ATTR VkBool32 VKAPI_CALL genericDebugReportCallback(
 
 	Highlight highlight;
 	if( (flags & VK_DEBUG_REPORT_ERROR_BIT_EXT) || (flags & VK_DEBUG_REPORT_WARNING_BIT_EXT) || (flags & VK_DEBUG_REPORT_PERFORMANCE_WARNING_BIT_EXT) ){
-		highlight = highlightOn;
+		highlight = Highlight::on;
 	}
-	else highlight = highlightOff;
+	else highlight = Highlight::off;
 
 
 	genericDebugCallback(  dbrflags_to_string( flags ), highlight, string(pLayerPrefix) + ", " + to_string( messageCode ), to_string( objectType ) + "(" + to_string_hex( object ) + ")", pMessage  );
@@ -121,9 +122,9 @@ VKAPI_ATTR VkBool32 VKAPI_CALL genericDebugUtilsCallback(
 
 	Highlight highlight;
 	if( (messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT) || (messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT)){
-		highlight = highlightOn;
+		highlight = Highlight::on;
 	}
-	else highlight = highlightOff;
+	else highlight = Highlight::off;
 
 	string objects;
 	bool first = true;
@@ -154,11 +155,11 @@ VkDebugReportFlagsEXT translateFlags( const VkDebugUtilsMessageSeverityFlagsEXT 
 	return flags;
 }
 
-DebugObjectVariant initDebug( const VkInstance instance, const DebugObjectVariant::DebugObjectTag debugExtension, const VkDebugUtilsMessageSeverityFlagsEXT debugSeverity, const VkDebugUtilsMessageTypeFlagsEXT debugType ){
+DebugObjectVariant initDebug( const VkInstance instance, const DebugObjectType debugExtension, const VkDebugUtilsMessageSeverityFlagsEXT debugSeverity, const VkDebugUtilsMessageTypeFlagsEXT debugType ){
 	DebugObjectVariant debug;
 	debug.tag = debugExtension;
 
-	if( debugExtension == DebugObjectVariant::debugUtilsType ){
+	if( debugExtension == DebugObjectType::debugUtils ){
 		const VkDebugUtilsMessengerCreateInfoEXT dmci = {
 			VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT,
 			nullptr, // pNext
@@ -171,7 +172,7 @@ DebugObjectVariant initDebug( const VkInstance instance, const DebugObjectVarian
 
 		const VkResult errorCode = vkCreateDebugUtilsMessengerEXT( instance, &dmci, nullptr, &debug.debugUtilsMessenger ); RESULT_HANDLER( errorCode, "vkCreateDebugUtilsMessengerEXT" );
 	}
-	else if( debugExtension == DebugObjectVariant::debugReportType ){
+	else if( debugExtension == DebugObjectType::debugReport ){
 		const VkDebugReportCallbackCreateInfoEXT debugCreateInfo{
 			VK_STRUCTURE_TYPE_DEBUG_REPORT_CALLBACK_CREATE_INFO_EXT,
 			nullptr, // pNext
@@ -190,10 +191,10 @@ DebugObjectVariant initDebug( const VkInstance instance, const DebugObjectVarian
 }
 
 void killDebug( const VkInstance instance, const DebugObjectVariant debug ){
-	if( debug.tag == DebugObjectVariant::debugUtilsType ){
+	if( debug.tag == DebugObjectType::debugUtils ){
 		vkDestroyDebugUtilsMessengerEXT( instance, debug.debugUtilsMessenger, nullptr );
 	}
-	else if( debug.tag == DebugObjectVariant::debugReportType ){
+	else if( debug.tag == DebugObjectType::debugReport ){
 		vkDestroyDebugReportCallbackEXT( instance, debug.debugReportCallback, nullptr );
 	}
 	else{
