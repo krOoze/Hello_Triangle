@@ -107,10 +107,16 @@ if( CYGWIN )
 	set( CMAKE_FIND_LIBRARY_PREFIXES "" )
 	set( CMAKE_FIND_LIBRARY_SUFFIXES ".lib" ".dll" )
 endif()
+
+if(CMAKE_SIZEOF_VOID_P EQUAL 8)
+	set(VULKAN_LIBRARY_DIRS "${VULKAN_SDK}/lib" "${VULKAN_SDK}/Lib")
+elseif(CMAKE_SIZEOF_VOID_P EQUAL 4)
+	set(VULKAN_LIBRARY_DIRS "${VULKAN_SDK}/Lib32")
+endif()
 find_library(
 	VULKAN_LIBRARY
 	NAMES vulkan vulkan-1
-	PATHS "${VULKAN_SDK}/lib" "${VULKAN_SDK}/Lib" "${VULKAN_SDK}/Lib32"
+	PATHS ${VULKAN_LIBRARY_DIRS}
 	NO_DEFAULT_PATH
 )
 message( "Vulkan libs: " ${VULKAN_LIBRARY} )
