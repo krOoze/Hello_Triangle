@@ -42,10 +42,11 @@ Requirements
 
 **OS**: Windows or Linux  
 **Language**: C++14  
-**Build environment**: (latest) LunarG SDK (requires `VULKAN_SDK` variable, and `glslc` binary built)  
+**Build environment**: (latest) [Vulkan SDK](https://vulkan.lunarg.com/sdk/home) (requires `VULKAN_SDK` variable being set)  
 **Build environment[Windows]**: Visual Studio, Cygwin, or MinGW (or IDEs running on top of them)  
-**Build environment[Linux]**: g++ or clang (and compatible IDEs) and libxcb-dev and libxcb-keysyms-dev  
-**Build Environment[GLFW]**: GLFW 3.2+ (already included as a git submodule), requires `xorg-dev` package on Linux  
+**Build environment[Linux]**: CMake compatible compiler and build system and `libxcb-dev` and `libxcb-keysyms-dev`  
+**Build environment[MacOS]**: CMake compatible compiler and build system  
+**Build Environment[GLFW]**: GLFW 3.2+ (already included as a git submodule), requires `xorg-dev` (or XCB) package on Linux  
 **Build environment[Xlib]**: Requires `xorg-dev` package  
 **Build environment[XCB]**: Requires `libxcb1-dev`, `libxcb-util-dev`, `libxcb-keysyms1-dev`, and `x11proto-dev` packages  
 **Build environment[Wayland]**: Requires `libwayland-dev` and `libxkbcommon-dev` packages  
