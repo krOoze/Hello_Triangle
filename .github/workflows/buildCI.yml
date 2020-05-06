@@ -107,5 +107,5 @@ jobs:
       working-directory: source/build
     - uses: actions/upload-artifact@v1
       with:
-        name: Hello Vulkan Triangle App -- Linux ${{ matrix.build_config }}
+        name: Hello Vulkan Triangle App -- macOS ${{ matrix.build_config }}
         path: source/build/HelloTriangle
