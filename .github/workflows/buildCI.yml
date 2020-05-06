@@ -60,7 +60,6 @@ jobs:
         ref: linux
         persist-credentials: false
     - run: echo "::add-path::${{ env.VULKAN_SDK }}/bin"
-    - run: echo $VULKAN_SDK && echo $PATH
     - run: sudo apt update && sudo apt install xorg-dev
     - uses: actions/checkout@v2
       with:
@@ -69,6 +68,40 @@ jobs:
         persist-credentials: false
     - run: mkdir -p source/build
     - run: cmake -DCMAKE_BUILD_TYPE=${{ matrix.build_config }} -G "Unix Makefiles" ..
+      working-directory: source/build
+    - run: cmake --build .
+      working-directory: source/build
+    - uses: actions/upload-artifact@v1
+      with:
+        name: Hello Vulkan Triangle App -- Linux ${{ matrix.build_config }}
+        path: source/build/HelloTriangle
+
+  mac_jorb:
+    runs-on: macos-latest
+    strategy:
+      matrix:
+        build_config: ['Debug', 'Release']
+    defaults:
+      run:
+        shell: bash
+    env:
+      VULKAN_SDK: ${{ github.workspace }}/VulkanSDK/macOS
+
+    steps:
+    - uses: actions/checkout@v2
+      with:
+        repository: 'krOoze/vk_sdk_lite'
+        path: 'VulkanSDK'
+        ref: macos
+        persist-credentials: false
+    - run: echo "::add-path::${{ env.VULKAN_SDK }}/bin"
+    - uses: actions/checkout@v2
+      with:
+        path: 'source'
+        submodules: 'recursive'
+        persist-credentials: false
+    - run: mkdir -p source/build
+    - run: cmake -DCMAKE_BUILD_TYPE=${{ matrix.build_config }} ..
       working-directory: source/build
     - run: cmake --build .
       working-directory: source/build
