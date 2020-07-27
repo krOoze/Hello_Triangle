@@ -42,6 +42,7 @@ jobs:
         path: source\build\${{ matrix.build_config }}\HelloTriangle.exe
 
   linux_jorb:
+    if: endsWith( github.ref, 'dxgi_interop' ) == false
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -77,6 +78,7 @@ jobs:
         path: source/build/HelloTriangle
 
   mac_jorb:
+    if: endsWith( github.ref, 'dxgi_interop' ) == false
     runs-on: macos-latest
     strategy:
       matrix:
