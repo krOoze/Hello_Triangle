@@ -45,7 +45,6 @@ const char* to_string( const VkResult r ){
 		case VK_ERROR_INCOMPATIBLE_DISPLAY_KHR:                     return "VK_ERROR_INCOMPATIBLE_DISPLAY_KHR";
 		case VK_ERROR_VALIDATION_FAILED_EXT:                        return "VK_ERROR_VALIDATION_FAILED_EXT";
 		case VK_ERROR_INVALID_SHADER_NV:                            return "VK_ERROR_INVALID_SHADER_NV";
-		case VK_ERROR_INCOMPATIBLE_VERSION_KHR:                     return "VK_ERROR_INCOMPATIBLE_VERSION_KHR";
 		case VK_ERROR_INVALID_DRM_FORMAT_MODIFIER_PLANE_LAYOUT_EXT: return "VK_ERROR_INVALID_DRM_FORMAT_MODIFIER_PLANE_LAYOUT_EXT";
 		case VK_ERROR_NOT_PERMITTED_EXT:                            return "VK_ERROR_NOT_PERMITTED_EXT";
 		case VK_ERROR_FULL_SCREEN_EXCLUSIVE_MODE_LOST_EXT:          return "VK_ERROR_FULL_SCREEN_EXCLUSIVE_MODE_LOST_EXT";
@@ -94,6 +93,7 @@ std::string to_string( const VkDebugReportObjectTypeEXT o ){
 		case VK_DEBUG_REPORT_OBJECT_TYPE_VALIDATION_CACHE_EXT_EXT:       return "ValidationCacheEXT";
 		case VK_DEBUG_REPORT_OBJECT_TYPE_SAMPLER_YCBCR_CONVERSION_EXT:   return "SamplerYcbcrConversion";
 		case VK_DEBUG_REPORT_OBJECT_TYPE_DESCRIPTOR_UPDATE_TEMPLATE_EXT: return "DescriptorUpdateTemplate";
+		case VK_DEBUG_REPORT_OBJECT_TYPE_ACCELERATION_STRUCTURE_KHR_EXT: return "AccelerationStructureKHR";
 		case VK_DEBUG_REPORT_OBJECT_TYPE_ACCELERATION_STRUCTURE_NV_EXT:  return "AccelerationStructureNV";
 		default:                                                         return "unrecognized type";
 	}
@@ -137,7 +137,9 @@ std::string to_string( const VkObjectType o ){
 		case VK_OBJECT_TYPE_DEBUG_UTILS_MESSENGER_EXT:       return "DebugUtilsMessengerEXT";
 		case VK_OBJECT_TYPE_ACCELERATION_STRUCTURE_KHR:      return "AccelerationStructureKHR";
 		case VK_OBJECT_TYPE_VALIDATION_CACHE_EXT:            return "ValidationCacheEXT";
+		case VK_OBJECT_TYPE_ACCELERATION_STRUCTURE_NV:       return "AccelerationStructureNV";
 		case VK_OBJECT_TYPE_PERFORMANCE_CONFIGURATION_INTEL: return "PerformanceConfigurationINTEL";
+		case VK_OBJECT_TYPE_DEFERRED_OPERATION_KHR:          return "DeferredOperationKHR";
 		case VK_OBJECT_TYPE_INDIRECT_COMMANDS_LAYOUT_NV:     return "IndirectCommandsLayoutNV";
 		case VK_OBJECT_TYPE_PRIVATE_DATA_SLOT_EXT:           return "PrivateDataSlotEXT";
 		default:                                             return "unrecognized type";
