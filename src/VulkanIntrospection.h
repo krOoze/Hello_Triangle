@@ -134,6 +134,10 @@ std::string to_string( const VkObjectType o ){
 		case VK_OBJECT_TYPE_DISPLAY_KHR:                     return "DisplayKHR";
 		case VK_OBJECT_TYPE_DISPLAY_MODE_KHR:                return "DisplayModeKHR";
 		case VK_OBJECT_TYPE_DEBUG_REPORT_CALLBACK_EXT:       return "DebugReportCallbackEXT";
+#ifdef VK_ENABLE_BETA_EXTENSIONS
+		case VK_OBJECT_TYPE_VIDEO_SESSION_KHR: return "VideoSessionKHR";
+		case VK_OBJECT_TYPE_VIDEO_SESSION_PARAMETERS_KHR: return "VideoSessionParametersKHR";
+#endif
 		case VK_OBJECT_TYPE_DEBUG_UTILS_MESSENGER_EXT:       return "DebugUtilsMessengerEXT";
 		case VK_OBJECT_TYPE_ACCELERATION_STRUCTURE_KHR:      return "AccelerationStructureKHR";
 		case VK_OBJECT_TYPE_VALIDATION_CACHE_EXT:            return "ValidationCacheEXT";

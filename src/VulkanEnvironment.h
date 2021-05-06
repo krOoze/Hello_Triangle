@@ -12,7 +12,7 @@
 
 #include "CompilerMessages.h"
 
-#define REQUIRED_HEADER_VERSION 162
+#define REQUIRED_HEADER_VERSION 176
 
 #ifdef NDEBUG
 	#ifndef VULKAN_VALIDATION
