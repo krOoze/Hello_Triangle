@@ -57,13 +57,16 @@ struct PlatformSwapchainImpl{
 	std::vector<HANDLE> sharedHandles;
 };
 
-using PlatformSurface = uint64_t;
-using PlatformSwapchain = uint64_t;
+VK_DEFINE_NON_DISPATCHABLE_HANDLE(PlatformSurface);
+VK_DEFINE_NON_DISPATCHABLE_HANDLE(PlatformSwapchain);
+uint64_t lastUsedHandle = 0;
+template< typename T >
+T newHandle(){ assert(lastUsedHandle <= UINT64_MAX); return (T)++lastUsedHandle; }
 
 std::unordered_map<PlatformSurface, PlatformSurfaceImpl> platformSurfaces;
-PlatformSurface nextFreeSurfaceHandle = 1;
+
 std::unordered_map<PlatformSwapchain, PlatformSwapchainImpl> platformSwapchains;
-PlatformSurface nextFreeSwapchainHandle = 1;
+PlatformSwapchain nextFreeSwapchainHandle = (PlatformSwapchain)1;
 
 TODO( "We shouldn't depend on this specific format" )
 VkFormat extImgFormat = VK_FORMAT_B8G8R8A8_UNORM;
@@ -382,9 +385,8 @@ PlatformSurface initSurface( VkInstance /*instance*/, PlatformWindow window ){
 	PlatformSurfaceImpl surface;
 	surface.window = window;
 
-	const PlatformSurface surfaceHandle = ::nextFreeSurfaceHandle;
+	const PlatformSurface surfaceHandle = newHandle<PlatformSurface>();
 	::platformSurfaces[surfaceHandle] = surface;
-	++::nextFreeSurfaceHandle;
 
 	return surfaceHandle;
 }
@@ -606,9 +608,8 @@ PlatformSwapchain initSwapchain(
 
 		ChHR(  swapchain.dxgiFac->MakeWindowAssociation( swapchain.surface.window.hWnd, DXGI_MWA_NO_ALT_ENTER )  );
 
-		newSwapchain = ::nextFreeSwapchainHandle;
+		newSwapchain = newHandle<PlatformSwapchain>();
 		::platformSwapchains[newSwapchain] = swapchain;
-		::nextFreeSwapchainHandle++;
 	}
 
 	return newSwapchain;
