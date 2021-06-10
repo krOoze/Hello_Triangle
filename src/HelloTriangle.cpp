@@ -396,7 +396,8 @@ int helloTriangle() try{
 
 
 		// cleanup old
-		vector<VkSemaphore> oldImageReadySs = imageReadySs; imageReadySs.clear();
+		vector<VkSemaphore> oldImageReadySs;
+		oldImageReadySs.swap( imageReadySs );
 		if( oldSwapchain ){
 			{VkResult errorCode = vkDeviceWaitIdle( device ); RESULT_HANDLER( errorCode, "vkDeviceWaitIdle" );}
 

@@ -491,22 +491,26 @@ PlatformSwapchain initSwapchain(
 
 	const auto& newSurfaceImpl = ::platformSurfaces.at( surface );
 
-	PlatformSwapchain newSwapchain;
+	const PlatformSwapchain newSwapchain = newHandle<PlatformSwapchain>();
 
 	if( oldSwapchain && newSurfaceImpl.window.hWnd == ::platformSwapchains.at( oldSwapchain ).surface.window.hWnd ){ // mostly everything allowed to change with ResizeBuffers
 		auto& oldSwapImpl = ::platformSwapchains.at( oldSwapchain );
-		oldSwapImpl.imageCount = minImageCount;
+		::platformSwapchains[newSwapchain] = oldSwapImpl;
 
-		for( const auto im : oldSwapImpl.importedMemories ) vkFreeMemory( device, im, nullptr );
 		oldSwapImpl.importedMemories.clear();
-		for( const auto sh : oldSwapImpl.sharedHandles ) ChB( CloseHandle( sh ) );
 		oldSwapImpl.sharedHandles.clear();
-		for( const auto img : oldSwapImpl.swapchainImages ) vkDestroyImage( device, img, nullptr );
 		oldSwapImpl.swapchainImages.clear();
 
-		ChHR(  oldSwapImpl.dxgiSwapchain->ResizeBuffers( oldSwapImpl.imageCount, capabilities.currentExtent.width, capabilities.currentExtent.height, format, swapchainFlags)  );
+		auto& newSwapImpl = ::platformSwapchains.at( newSwapchain );
+		newSwapImpl.imageCount = minImageCount;
+		for( const auto im : newSwapImpl.importedMemories ) vkFreeMemory( device, im, nullptr );
+		newSwapImpl.importedMemories.clear();
+		for( const auto sh : newSwapImpl.sharedHandles ) ChB( CloseHandle( sh ) );
+		newSwapImpl.sharedHandles.clear();
+		for( const auto img : newSwapImpl.swapchainImages ) vkDestroyImage( device, img, nullptr );
+		newSwapImpl.swapchainImages.clear();
 
-		newSwapchain = oldSwapchain;
+		ChHR(  newSwapImpl.dxgiSwapchain->ResizeBuffers( newSwapImpl.imageCount, capabilities.currentExtent.width, capabilities.currentExtent.height, format, swapchainFlags)  );
 	}
 	else{
 		PlatformSwapchainImpl swapchain;
@@ -608,7 +612,6 @@ PlatformSwapchain initSwapchain(
 
 		ChHR(  swapchain.dxgiFac->MakeWindowAssociation( swapchain.surface.window.hWnd, DXGI_MWA_NO_ALT_ENTER )  );
 
-		newSwapchain = newHandle<PlatformSwapchain>();
 		::platformSwapchains[newSwapchain] = swapchain;
 	}
 
