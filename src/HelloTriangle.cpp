@@ -861,14 +861,15 @@ std::pair<uint32_t, uint32_t> getQueueFamilies( const VkPhysicalDevice physDevic
 		return isGraphics( props ) && isPresent( props, queueFamily );
 	};
 
-	uint32_t graphicsQueueFamily, presentQueueFamily;
+	uint32_t graphicsQueueFamily = notFound;
+	uint32_t presentQueueFamily = notFound;
 	if( ::forceSeparatePresentQueue ){
 		graphicsQueueFamily = findQueueFamilyThat( isGraphics );
 
 		const auto isSeparatePresent = [graphicsQueueFamily, isPresent](const VkQueueFamilyProperties& props, const uint32_t queueFamily){
 			return queueFamily != graphicsQueueFamily && isPresent( props, queueFamily );
 		};
-		findQueueFamilyThat( isSeparatePresent );
+		presentQueueFamily = findQueueFamilyThat( isSeparatePresent );
 	}
 	else{
 		graphicsQueueFamily = presentQueueFamily = findQueueFamilyThat( isFusedGraphicsAndPresent );
