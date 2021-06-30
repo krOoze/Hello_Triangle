@@ -122,8 +122,7 @@ VkDeviceMemory initMemory(
 	VkDevice device,
 	VkPhysicalDeviceMemoryProperties physicalDeviceMemoryProperties,
 	T resource,
-	VkMemoryPropertyFlags requiredFlags,
-	VkMemoryPropertyFlags desiredFlags = 0
+	const std::vector<VkMemoryPropertyFlags>& memoryTypePriority
 );
 void setMemoryData( VkDevice device, VkDeviceMemory memory, void* begin, size_t size );
 void killMemory( VkDevice device, VkDeviceMemory memory );
@@ -355,12 +354,15 @@ int helloTriangle() try{
 	VkPipelineLayout pipelineLayout = initPipelineLayout( device );
 
 	VkBuffer vertexBuffer = initBuffer( device, sizeof( decltype( triangle )::value_type ) * triangle.size(), VK_BUFFER_USAGE_VERTEX_BUFFER_BIT );
+	const std::vector<VkMemoryPropertyFlags> memoryTypePriority{
+		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, // preferably wanna device-side memory that can be updated from host without hassle
+		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT // guaranteed to allways be supported
+	};
 	VkDeviceMemory vertexBufferMemory = initMemory<ResourceType::Buffer>(
 		device,
 		physicalDeviceMemoryProperties,
 		vertexBuffer,
-		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
+		memoryTypePriority
 	);
 	setVertexData( device, vertexBufferMemory, triangle ); // Writes throug memory map. Synchronization is implicit for any subsequent vkQueueSubmit batches.
 
@@ -992,31 +994,26 @@ VkDeviceMemory initMemory(
 	VkDevice device,
 	VkPhysicalDeviceMemoryProperties physicalDeviceMemoryProperties,
 	T resource,
-	VkMemoryPropertyFlags requiredFlags,
-	VkMemoryPropertyFlags desiredFlags
+	const std::vector<VkMemoryPropertyFlags>& memoryTypePriority
 ){
-	VkMemoryRequirements memoryRequirements = getMemoryRequirements<resourceType>( device, resource );
+	const VkMemoryRequirements memoryRequirements = getMemoryRequirements<resourceType>( device, resource );
 
-	uint32_t memoryType = 0;
-	bool found = false;
+	const auto indexToBit = []( const uint32_t index ){ return 0x1 << index; };
 
-	for( uint32_t i = 0; i < 32; ++i ){
-		if( memoryRequirements.memoryTypeBits & 0x1 ){
-			if( (physicalDeviceMemoryProperties.memoryTypes[i].propertyFlags & requiredFlags) == requiredFlags ){
-				if( !found ){
-					memoryType = i;
-					found = true;
-				}
-				else if( /*found &&*/ (physicalDeviceMemoryProperties.memoryTypes[i].propertyFlags & desiredFlags) == desiredFlags ){
+	const uint32_t memoryTypeNotFound = UINT32_MAX;
+	uint32_t memoryType = memoryTypeNotFound;
+	for( const auto desiredMemoryType : memoryTypePriority ){
+		const uint32_t maxMemoryTypeCount = 32;
+		for( uint32_t i = 0; memoryType == memoryTypeNotFound && i < maxMemoryTypeCount; ++i ){
+			if( memoryRequirements.memoryTypeBits & indexToBit(i) ){
+				if( (physicalDeviceMemoryProperties.memoryTypes[i].propertyFlags & desiredMemoryType) == desiredMemoryType ){
 					memoryType = i;
 				}
 			}
 		}
-
-		memoryRequirements.memoryTypeBits >>= 1;
 	}
 
-	if( !found ) throw "Can't find compatible mappable memory for the resource";
+	if( memoryType == memoryTypeNotFound ) throw "Can't find compatible mappable memory for the resource";
 
 	VkMemoryAllocateInfo memoryInfo{
 		VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
