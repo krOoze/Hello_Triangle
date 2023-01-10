@@ -27,6 +27,7 @@
 
 #include <vulkan/vulkan.h> // also assume core+WSI commands are loaded
 static_assert( VK_HEADER_VERSION >= REQUIRED_HEADER_VERSION, "Update your SDK! This app is written against Vulkan header version " STRINGIZE(REQUIRED_HEADER_VERSION) "." );
+#include <vulkan/vulkan_beta.h> // Required for VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME
 
 #include "EnumerateScheme.h"
 #include "ErrorHandling.h"
@@ -86,6 +87,7 @@ constexpr bool forceSeparatePresentQueue = false;
 //////////////////////////////////////////////////////////////////////////////////
 
 bool isLayerSupported( const char* layer, const vector<VkLayerProperties>& supportedLayers );
+bool isExtensionRequested( const char* extension, const vector<const char *>& requestedExtensions );
 bool isExtensionSupported( const char* extension, const vector<VkExtensionProperties>& supportedExtensions );
 // treat layers as optional; app can always run without em -- i.e. return those supported
 vector<const char*> checkInstanceLayerSupport( const vector<const char*>& requestedLayers, const vector<VkLayerProperties>& supportedLayers );
@@ -273,6 +275,17 @@ int helloTriangle() try{
 		platformSurfaceExtension.c_str()
 	};
 
+	// Required to support devices that don't support Vulkan natively and rely on Vulkan Portability (e.g. macOS using MoltenVK)
+	if(  isExtensionSupported( VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME, supportedInstanceExtensions )  ) {
+		// https://github.com/KhronosGroup/Vulkan-Loader/blob/52ffa76190da257f6f0c99c61ebc7a69ebda356e/loader/trampoline.c#L533
+		requestedInstanceExtensions.push_back( VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME );
+		
+		// https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkCreateDevice.html#VUID-vkCreateDevice-ppEnabledExtensionNames-01387
+		if(  isExtensionSupported( VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME, supportedInstanceExtensions )  ) {
+			requestedInstanceExtensions.push_back( VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME );
+		}
+	}
+
 #if VULKAN_VALIDATION
 	DebugObjectType debugExtensionTag;
 	if(  isExtensionSupported( VK_EXT_DEBUG_UTILS_EXTENSION_NAME, supportedInstanceExtensions )  ){
@@ -333,7 +346,12 @@ int helloTriangle() try{
 	std::tie( graphicsQueueFamily, presentQueueFamily ) = getQueueFamilies( physicalDevice, surface );
 
 	const VkPhysicalDeviceFeatures features = {}; // don't need any special feature for this demo
-	const vector<const char*> deviceExtensions = { VK_KHR_SWAPCHAIN_EXTENSION_NAME };
+	vector<const char*> deviceExtensions = { VK_KHR_SWAPCHAIN_EXTENSION_NAME };
+
+	// https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkDeviceCreateInfo.html#VUID-VkDeviceCreateInfo-pProperties-04451
+	if (isExtensionRequested(VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME, requestedInstanceExtensions)) {
+		deviceExtensions.push_back(VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME);
+	}
 
 	const VkDevice device = initDevice( physicalDevice, features, graphicsQueueFamily, presentQueueFamily, requestedLayers, deviceExtensions );
 	const VkQueue graphicsQueue = getQueue( device, graphicsQueueFamily, 0 );
@@ -632,6 +650,10 @@ bool isLayerSupported( const char* layer, const vector<VkLayerProperties>& suppo
 	return std::any_of( supportedLayers.begin(), supportedLayers.end(), isSupportedPred );
 }
 
+bool isExtensionRequested(const char* extension, const vector<const char *>& requestedExtensions) {
+	return std::find_if( requestedExtensions.begin(), requestedExtensions.end(), [extension](const char* e){ return std::strcmp( e, extension ) == 0; } ) != requestedExtensions.end();
+}
+
 bool isExtensionSupported( const char* extension, const vector<VkExtensionProperties>& supportedExtensions ){
 	const auto isSupportedPred = [extension]( const VkExtensionProperties& prop ) -> bool{
 		return std::strcmp( extension, prop.extensionName ) == 0;
@@ -725,11 +747,17 @@ VkInstance initInstance( const vector<const char*>& layers, const vector<const c
 		nullptr // pUserData
 	};
 
-	bool debugUtils = std::find_if( extensions.begin(), extensions.end(), [](const char* e){ return std::strcmp( e, VK_EXT_DEBUG_UTILS_EXTENSION_NAME ) == 0; } ) != extensions.end();
-	bool debugReport = std::find_if( extensions.begin(), extensions.end(), [](const char* e){ return std::strcmp( e, VK_EXT_DEBUG_REPORT_EXTENSION_NAME ) == 0; } ) != extensions.end();
+	bool debugUtils = isExtensionRequested(VK_EXT_DEBUG_UTILS_EXTENSION_NAME, extensions);
+	bool debugReport = isExtensionRequested(VK_EXT_DEBUG_REPORT_EXTENSION_NAME, extensions);
 	if( !debugUtils && !debugReport ) throw "VULKAN_VALIDATION is enabled but neither VK_EXT_debug_utils nor VK_EXT_debug_report extension is being enabled!";
 	const void* debugpNext = debugUtils ? (void*)&debugUtilsCreateInfo : (void*)&debugReportCreateInfo;
 #endif
+
+	VkInstanceCreateFlags instanceCreateFlags = 0;
+	// https://github.com/KhronosGroup/Vulkan-Loader/blob/52ffa76190da257f6f0c99c61ebc7a69ebda356e/loader/trampoline.c#L533
+	if (isExtensionRequested(VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME, extensions)) {
+		instanceCreateFlags |= VK_INSTANCE_CREATE_ENUMERATE_PORTABILITY_BIT_KHR;
+	}
 
 	const VkInstanceCreateInfo instanceInfo{
 		VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
@@ -738,7 +766,7 @@ VkInstance initInstance( const vector<const char*>& layers, const vector<const c
 #else
 		nullptr, // pNext
 #endif
-		0, // flags - reserved for future use
+		instanceCreateFlags,
 		&appInfo,
 		static_cast<uint32_t>( layers.size() ),
 		layers.data(),
