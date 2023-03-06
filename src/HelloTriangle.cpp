@@ -277,10 +277,7 @@ int helloTriangle() try{
 
 	// Required to support devices that don't support Vulkan natively and rely on Vulkan Portability (e.g. macOS using MoltenVK)
 	if(  isExtensionSupported( VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME, supportedInstanceExtensions )  ) {
-		// https://github.com/KhronosGroup/Vulkan-Loader/blob/52ffa76190da257f6f0c99c61ebc7a69ebda356e/loader/trampoline.c#L533
 		requestedInstanceExtensions.push_back( VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME );
-		
-		// https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkCreateDevice.html#VUID-vkCreateDevice-ppEnabledExtensionNames-01387
 		if(  isExtensionSupported( VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME, supportedInstanceExtensions )  ) {
 			requestedInstanceExtensions.push_back( VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME );
 		}
@@ -348,8 +345,7 @@ int helloTriangle() try{
 	const VkPhysicalDeviceFeatures features = {}; // don't need any special feature for this demo
 	vector<const char*> deviceExtensions = { VK_KHR_SWAPCHAIN_EXTENSION_NAME };
 
-	// https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkDeviceCreateInfo.html#VUID-VkDeviceCreateInfo-pProperties-04451
-	if (isExtensionRequested(VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME, requestedInstanceExtensions)) {
+	if (isExtensionRequested(VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME, requestedInstanceExtensions) && isExtensionSupported(VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME, supportedInstanceExtensions)) {
 		deviceExtensions.push_back(VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME);
 	}
 
@@ -651,7 +647,11 @@ bool isLayerSupported( const char* layer, const vector<VkLayerProperties>& suppo
 }
 
 bool isExtensionRequested(const char* extension, const vector<const char *>& requestedExtensions) {
-	return std::find_if( requestedExtensions.begin(), requestedExtensions.end(), [extension](const char* e){ return std::strcmp( e, extension ) == 0; } ) != requestedExtensions.end();
+    const auto isRequestedPred = [extension]( const char* exten ) -> bool{
+        return std::strcmp( extension, exten ) == 0;
+    };
+
+    return std::any_of( requestedExtensions.begin(), requestedExtensions.end(), isRequestedPred );
 }
 
 bool isExtensionSupported( const char* extension, const vector<VkExtensionProperties>& supportedExtensions ){
@@ -754,7 +754,6 @@ VkInstance initInstance( const vector<const char*>& layers, const vector<const c
 #endif
 
 	VkInstanceCreateFlags instanceCreateFlags = 0;
-	// https://github.com/KhronosGroup/Vulkan-Loader/blob/52ffa76190da257f6f0c99c61ebc7a69ebda356e/loader/trampoline.c#L533
 	if (isExtensionRequested(VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME, extensions)) {
 		instanceCreateFlags |= VK_INSTANCE_CREATE_ENUMERATE_PORTABILITY_BIT_KHR;
 	}
