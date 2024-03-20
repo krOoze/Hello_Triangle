@@ -566,8 +566,8 @@ int helloTriangle() try{
 
 	killCommandPool( device,  commandPool );
 
-	killMemory( device, vertexBufferMemory );
 	killBuffer( device, vertexBuffer );
+	killMemory( device, vertexBufferMemory );
 
 	killPipelineLayout( device, pipelineLayout );
 	killShaderModule( device, fragmentShader );
@@ -1234,7 +1234,9 @@ VkSwapchainKHR initSwapchain(
 	uint32_t myMinImageCount = capabilities.minImageCount + 1;
 	if( capabilities.maxImageCount ) myMinImageCount = std::min<uint32_t>( myMinImageCount, capabilities.maxImageCount );
 
-	const std::vector<uint32_t> queueFamilies = { graphicsQueueFamily, presentQueueFamily };
+	std::vector<uint32_t> queueFamilies = { graphicsQueueFamily };
+	if(graphicsQueueFamily != presentQueueFamily) queueFamilies.push_back( presentQueueFamily );
+
 	VkSwapchainCreateInfoKHR swapchainInfo{
 		VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
 		nullptr, // pNext for extensions use
@@ -1247,7 +1249,7 @@ VkSwapchainKHR initSwapchain(
 		1,
 		VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, // VkImage usage flags
 		// It should be fine to just use CONCURRENT in the off chance we encounter the elusive GPU with separate present queue
-		graphicsQueueFamily == presentQueueFamily ? VK_SHARING_MODE_EXCLUSIVE : VK_SHARING_MODE_CONCURRENT,
+		queueFamilies.size() > 1 ? VK_SHARING_MODE_CONCURRENT : VK_SHARING_MODE_EXCLUSIVE,
 		static_cast<uint32_t>( queueFamilies.size() ),
 		queueFamilies.data(),
 		capabilities.currentTransform,
