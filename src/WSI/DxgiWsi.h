@@ -75,12 +75,14 @@ VkExtent2D currentWndSize;
 
 std::vector<const char*> getPlatformSurfaceExtensionNames(){
 	return {
+		VK_KHR_SURFACE_EXTENSION_NAME, // required by VK_KHR_swapchain, which we need to use LAYOUT_PRESENT
 		VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME,
 		VK_KHR_EXTERNAL_MEMORY_CAPABILITIES_EXTENSION_NAME
 	};
 };
 
 const std::vector<const char*> requiredDeviceExtensions = {
+	VK_KHR_SWAPCHAIN_EXTENSION_NAME, // to be able to use LAYOUT_PRESENT; would LAYOUT_GENERAL work?
 	VK_KHR_EXTERNAL_MEMORY_EXTENSION_NAME,
 	VK_KHR_EXTERNAL_MEMORY_WIN32_EXTENSION_NAME,
 	VK_KHR_DEDICATED_ALLOCATION_EXTENSION_NAME,
