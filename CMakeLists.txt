@@ -70,7 +70,7 @@ endif()
 
 # HelloTriangle binary
 set_property( DIRECTORY PROPERTY VS_STARTUP_PROJECT HelloTriangle )
-file(GLOB SOURCE_HEADERS "src/*.h")
+file(GLOB SOURCE_HEADERS "src/*.h" "src/WSI/*.h")
 add_executable( HelloTriangle WIN32 src/HelloTriangle.cpp ${SOURCE_HEADERS} )
 add_dependencies( HelloTriangle HelloTriangle_shaders )
 
@@ -101,7 +101,7 @@ find_path(
 	NO_DEFAULT_PATH
 )
 message( "Vulkan include dir: " ${VULKAN_INCLUDE} )
-include_directories( "${VULKAN_INCLUDE}" "src/" )
+include_directories( "${VULKAN_INCLUDE}" "src/" "src/WSI/" )
 
 if( CYGWIN )
 	set( CMAKE_FIND_LIBRARY_PREFIXES "" )
